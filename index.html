@@ -4,13 +4,51 @@
   <meta charset="utf-8">
   <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
   <meta name="theme-color" content="#fff4d6">
+  <meta http-equiv="Cache-Control" content="no-cache">
   <title>なにかな？クイズ</title>
   <link rel="icon" href="data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 100 100'><text y='.9em' font-size='90'>❓</text></svg>">
-  <link rel="stylesheet" href="style.css">
 </head>
 <body>
   <main id="app"></main>
-  <script src="quizzes.js"></script>
-  <script src="app.js"></script>
+  <script>
+    // ブラウザのキャッシュで古いクイズが出ないように、
+    // デプロイごとに変わる version.json を毎回取りにいき、その値を付けて読み込む。
+    (function () {
+      function getVersion() {
+        return fetch("version.json?t=" + Date.now(), { cache: "no-store" })
+          .then(function (r) { if (!r.ok) throw r; return r.json(); })
+          .then(function (d) { return String(d.v); })
+          .catch(function () { return String(Date.now()); }); // 取れないとき（ローカルなど）は毎回読み直す
+      }
+      function addScript(src) {
+        return new Promise(function (ok, ng) {
+          var s = document.createElement("script");
+          s.src = src; s.onload = ok; s.onerror = ng;
+          document.body.appendChild(s);
+        });
+      }
+      getVersion().then(function (v) {
+        window.QUIZ_VERSION = v;
+        var q = "?v=" + encodeURIComponent(v);
+        var css = new Promise(function (ok) {
+          var l = document.createElement("link");
+          l.rel = "stylesheet"; l.href = "style.css" + q; l.onload = ok; l.onerror = ok;
+          document.head.appendChild(l);
+        });
+        return Promise.all([css, addScript("quizzes.js" + q)]).then(function () { return addScript("app.js" + q); });
+      });
+
+      // ひらいたままの タブに もどってきたとき、あたらしい版が あれば よみなおす（クイズの とちゅうは しない）
+      function checkUpdate() {
+        if (document.visibilityState !== "visible" || window.QUIZ_PLAYING || !window.QUIZ_VERSION) return;
+        fetch("version.json?t=" + Date.now(), { cache: "no-store" })
+          .then(function (r) { return r.ok ? r.json() : null; })
+          .then(function (d) { if (d && String(d.v) !== window.QUIZ_VERSION) location.reload(); })
+          .catch(function () {});
+      }
+      document.addEventListener("visibilitychange", checkUpdate);
+      window.addEventListener("pageshow", function (e) { if (e.persisted) checkUpdate(); });
+    })();
+  </script>
 </body>
 </html>

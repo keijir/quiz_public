@@ -93,6 +93,7 @@
 
   // ---------- 画面: ホーム ----------
   function renderHome() {
+    window.QUIZ_PLAYING = false;
     const qs = levelQs();
     const total = qs.length;
     const notDone = qs.filter((q) => !isDone(q));
@@ -161,6 +162,7 @@
   }
 
   function startRound(mode, cat) {
+    window.QUIZ_PLAYING = true;
     const qs = pickQuestions(mode, cat);
     if (!qs.length) return renderHome();
     round = {
@@ -248,6 +250,7 @@
   }
 
   function renderResult() {
+    window.QUIZ_PLAYING = false;
     const total = round.items.length;
     const correct = round.items.filter((x) => x.answer).length;
     data.sessions.unshift({ at: Date.now(), lv: data.settings.level, mode: round.mode, cat: round.cat || null, total, correct });
@@ -273,6 +276,7 @@
 
   // ---------- 画面: きろく ----------
   function renderHistory() {
+    window.QUIZ_PLAYING = false;
     const qsLv = levelQs();
     const done = qsLv.filter(isDone);
     const answered = qsLv.map((q) => data.results[q.id]).filter(Boolean);

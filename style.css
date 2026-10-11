@@ -175,3 +175,6 @@ html, body { overflow-x: hidden; overflow-x: clip; }
 .frac { display: inline-flex; flex-direction: column; vertical-align: middle; text-align: center; line-height: 1.05; font-size: .85em; margin: 0 .1em; }
 .frac > span:first-child { border-bottom: 2px solid currentColor; padding: 0 .15em; }
 .qtext { white-space: pre-line; }
+
+/* グラフの しるし（○ ● ■）を 数えやすく */
+.marks { font-size: 1.25em; letter-spacing: .08em; color: var(--accent); line-height: 1.2; word-break: break-all; }

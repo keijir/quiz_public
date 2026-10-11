@@ -56,7 +56,9 @@
     return `${d.getMonth() + 1}/${d.getDate()} ${d.getHours()}:${String(d.getMinutes()).padStart(2, "0")}`;
   };
   // 表示用：エスケープして、分数（3/4）を たての 分数に する
-  const rich = (s) => esc(s).replace(/(\d+)\/(\d+)/g, '<span class="frac"><span>$1</span><span>$2</span></span>');
+  const rich = (s) => esc(s)
+    .replace(/(\d+)\/(\d+)/g, '<span class="frac"><span>$1</span><span>$2</span></span>')
+    .replace(/([○●■]{2,}|(?<=\s)[○●■](?=\s|$))/gm, '<span class="marks">$1</span>'); // グラフの しるしを 大きく
 
   // 読み上げ用：絵文字を はずし、記号・単位・分数を 読み方に かえる
   const SPEECH = [

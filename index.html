@@ -60,6 +60,7 @@
         });
         return Promise.all([css, addScript("quizzes.js" + q)])
           .then(function () { return addScript("quizzes-extra.js" + q); })
+          .then(function () { return addScript("icons.js" + q); })
           .then(function () { return addScript("app.js" + q); });
       });
 

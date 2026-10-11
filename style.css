@@ -133,8 +133,8 @@ h2 { font-size: 20px; margin: 22px 4px 4px; color: var(--sub); }
 
 /* ---- history ---- */
 .panel { background: var(--card); border-radius: var(--radius); padding: 14px 16px; margin: 10px 0; box-shadow: 0 4px 0 var(--line); }
-.stats { display: grid; grid-template-columns: repeat(3, 1fr); text-align: center; gap: 6px; }
-.stats b { display: block; font-size: 30px; }
+.stats { display: grid; grid-template-columns: repeat(4, 1fr); text-align: center; gap: 4px; }
+.stats b { display: block; font-size: 24px; }
 .stats span { font-size: 14px; color: var(--sub); }
 .qlist { list-style: none; padding: 0; margin: 6px 0 0; font-size: 16px; }
 .qlist li { display: flex; gap: 10px; padding: 8px 2px; border-bottom: 1px dashed var(--line); align-items: baseline; }
@@ -178,3 +178,41 @@ html, body { overflow-x: hidden; overflow-x: clip; }
 
 /* グラフの しるし（○ ● ■）を 数えやすく */
 .marks { font-size: 1.25em; letter-spacing: .08em; color: var(--accent); line-height: 1.2; word-break: break-all; }
+
+/* ---- アイコン（site/icons.js） ---- */
+.ic { width: 1em; height: 1em; vertical-align: -0.14em; flex: none; }
+.iconbtn .ic { vertical-align: -0.18em; }
+.accent { color: var(--accent); }
+.gold, .crown { color: #f5b400; }
+/* テーマの アイコン：テーマ色の 角丸タイルに 白で */
+.ci { display: inline-grid; place-items: center; width: 1.5em; height: 1.5em; border-radius: 28%; background: var(--c); color: #fff; vertical-align: middle; }
+.ci .ic { width: 72%; height: 72%; }
+.ci.big { display: grid; width: 56px; height: 56px; margin: 0 auto 4px; border-radius: 16px; font-size: 28px; box-shadow: inset 0 -3px 0 rgba(0,0,0,.12); }
+.ci.sm { width: 22px; height: 22px; border-radius: 7px; font-size: 14px; }
+.big .em { display: inline-grid; place-items: center; }
+.big.primary .em { color: #fff; }
+.big:not(.primary) .em { color: var(--accent); }
+.speak { color: var(--accent); display: grid; place-items: center; }
+.speak .ic { width: 24px; height: 24px; }
+.qtext .ic.inline { color: var(--accent); width: .95em; height: .95em; }
+.judge .mark .ic { stroke-width: 3; }
+.is-ok .mark { color: var(--ok); }
+.is-ng .mark { color: var(--ng); }
+.result .stars { color: #ffc107; }
+.result .stars .ic { width: 56px; height: 56px; }
+.win { color: #d99a00; font-weight: 800; }
+.exp.win { color: #d99a00; font-size: 19px; }
+/* まちがえた 回数 */
+.badge.ngc { background: #fdeaea; color: #c43c3c; margin-left: 6px; }
+.badge.ngc .ic, .badge .ic { width: 11px; height: 11px; vertical-align: -1px; margin-right: 2px; stroke-width: 3; }
+.okc { color: var(--ok); white-space: nowrap; }
+.ngc2 { color: var(--ng); white-space: nowrap; }
+.okc .ic, .ngc2 .ic { stroke-width: 3; width: .85em; height: .85em; margin-right: 1px; }
+.qlist .st.ngn { color: var(--ng); font-weight: 800; width: 44px; white-space: nowrap; }
+.ph { font-weight: 800; font-size: 19px; margin-bottom: 4px; }
+.ph .ic { color: var(--ng); }
+.lv small .ic { width: 14px; height: 14px; }
+.ci .ic { width: 1em; height: 1em; }
+.ci.big .ic { width: 34px; height: 34px; }
+.ci.sm .ic { width: 16px; height: 16px; }
+.stats span { font-size: 12px; line-height: 1.3; display: block; }

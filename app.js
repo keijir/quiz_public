@@ -29,6 +29,18 @@
   }
 
   const isDone = (q) => !!data.results[q.id];
+  const I = (name, cls) => window.icon(name, cls);
+  const catIcon = (c, cls) => `<span class="ci ${cls || ""}" style="--c:${c.color}">${I(c.icon)}</span>`;
+  // まちがえた 回数（古い 記録は n − ok で 計算）と、つづけて せいかいした 回数
+  const ngOf = (r) => (r ? (r.ng != null ? r.ng : r.n - r.ok) : 0);
+  const streakOf = (r) => (r ? (r.streak != null ? r.streak : r.lastOk ? 1 : 0) : 0);
+  // にがて：まちがえた ことが あって、まだ 2かい つづけて せいかい していない
+  const GRADUATE = 2;
+  const isWeak = (q) => { const r = data.results[q.id]; return ngOf(r) > 0 && streakOf(r) < GRADUATE; };
+  const weakSort = (a, b) => {
+    const ra = data.results[a.id], rb = data.results[b.id];
+    return ngOf(rb) - ngOf(ra) || (rb.lastNg || rb.last || 0) - (ra.lastNg || ra.last || 0);
+  };
   const lvOf = (q) => q.lv || "k";
   const levelOf = (id) => LEVELS.find((l) => l.id === id) || LEVELS[0];
   // いま えらんでいる がくねんの クイズ
@@ -37,9 +49,9 @@
   const levelTabs = () => `<div class="levels">${LEVELS.map((l) => {
     const left = QUIZZES.filter((q) => lvOf(q) === l.id && !isDone(q)).length;
     return `<button class="lv ${l.id === data.settings.level ? "on" : ""}" data-act="level" data-lv="${l.id}">
-      <b class="${[...(l.short || l.name)].length > 4 ? "long" : ""}">${esc(l.short || l.name)}</b><small>${left ? `のこり ${left}` : "👑"}</small></button>`;
+      <b class="${[...(l.short || l.name)].length > 4 ? "long" : ""}">${esc(l.short || l.name)}</b><small>${left ? `のこり ${left}` : I("crown", "crown")}</small></button>`;
   }).join("")}</div>`;
-  const catOf = (id) => CATS.find((c) => c.id === id) || { name: id, icon: "❓", color: "#ccc" };
+  const catOf = (id) => CATS.find((c) => c.id === id) || { name: id, icon: "nazo", color: "#bbb" };
 
   // ---------- 小物 ----------
   const esc = (s) => String(s).replace(/[&<>"']/g, (c) => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;", "'": "&#39;" }[c]));
@@ -57,6 +69,7 @@
   };
   // 表示用：エスケープして、分数（3/4）を たての 分数に する
   const rich = (s) => esc(s)
+    .replace(/🔊/g, () => window.icon("speaker", "inline"))
     .replace(/(\d+)\/(\d+)/g, '<span class="frac"><span>$1</span><span>$2</span></span>')
     .replace(/([○●■]{2,}|(?<=\s)[○●■](?=\s|$))/gm, '<span class="marks">$1</span>'); // グラフの しるしを 大きく
 
@@ -131,7 +144,7 @@
     const qs = levelQs();
     const total = qs.length;
     const notDone = qs.filter((q) => !isDone(q));
-    const wrong = qs.filter((q) => data.results[q.id] && !data.results[q.id].lastOk);
+    const weak = qs.filter(isWeak);
     const known = data.seen ? new Set(data.seen) : null;
     const added = known ? QUIZZES.filter((q) => !known.has(q.id)) : [];
     const addedByLv = LEVELS.map((l) => [l, added.filter((q) => lvOf(q) === l.id).length]).filter(([, n]) => n);
@@ -142,21 +155,21 @@
     app.innerHTML = `
       <div class="top">
         <div class="title">なにかな？<span>クイズ</span></div>
-        <button class="iconbtn" data-act="history">📒 きろく</button>
+        <button class="iconbtn" data-act="history">${I("book")} きろく</button>
       </div>
       ${levelTabs()}
-      ${added.length ? `<div class="panel">🎉 あたらしい クイズが <b>${added.length}もん</b> ふえたよ！<br><span class="small">${addedByLv.map(([l, n]) => `${esc(l.name)} ${n}もん`).join("・")}</span></div>` : ""}
+      ${added.length ? `<div class="panel">${I("sparkle", "accent")} あたらしい クイズが <b>${added.length}もん</b> ふえたよ！<br><span class="small">${addedByLv.map(([l, n]) => `${esc(l.name)} ${n}もん`).join("・")}</span></div>` : ""}
       <button class="big primary" data-act="start" data-mode="new" ${notDone.length ? "" : "disabled"}>
-        <span class="em">✨</span>
+        <span class="em">${I("sparkle")}</span>
         <span class="grow">まだ やってない クイズ<small>${notDone.length ? `のこり ${notDone.length}もん` : "ぜんぶ やったよ！すごい！"}</small></span>
       </button>
       <button class="big" data-act="start" data-mode="random">
-        <span class="em">🎲</span>
+        <span class="em">${I("dice")}</span>
         <span class="grow">ぜんぶから ランダム<small>${total}もんの なかから</small></span>
       </button>
-      <button class="big" data-act="start" data-mode="wrong" ${wrong.length ? "" : "disabled"}>
-        <span class="em">💪</span>
-        <span class="grow">まちがえた クイズに リベンジ<small>${wrong.length ? `${wrong.length}もん` : "いまは ないよ"}</small></span>
+      <button class="big" data-act="start" data-mode="wrong" ${weak.length ? "" : "disabled"}>
+        <span class="em">${I("target")}</span>
+        <span class="grow">にがて クイズ<small>${weak.length ? `${weak.length}もん・まちがえた かいすうが おおい じゅん` : "いまは ないよ"}</small></span>
       </button>
       <h2>テーマで えらぶ</h2>
       <div class="grid">
@@ -166,8 +179,8 @@
           const done = cqs.filter(isDone).length;
           const left = cqs.length - done;
           return `<button class="cat" style="--c:${c.color}" data-act="start" data-mode="cat" data-cat="${c.id}">
-            ${left ? `<span class="badge">のこり${left}</span>` : `<span class="badge done">👑</span>`}
-            <span class="em">${c.icon}</span>
+            ${left ? `<span class="badge">のこり${left}</span>` : `<span class="badge done">${I("crown")}</span>`}
+            ${catIcon(c, "big")}
             <span class="nm">${esc(c.name)}</span>
             <div class="bar"><i style="width:${Math.round((done / cqs.length) * 100)}%"></i></div>
             <span class="cnt">${done} / ${cqs.length}</span>
@@ -185,7 +198,7 @@
     const all = levelQs();
     let pool;
     if (mode === "new") pool = all.filter((q) => !isDone(q));
-    else if (mode === "wrong") pool = all.filter((q) => data.results[q.id] && !data.results[q.id].lastOk);
+    else if (mode === "wrong") return shuffle(all.filter(isWeak).sort(weakSort).slice(0, n)); // まちがえた 回数が 多い ものから
     else if (mode === "cat") {
       const qs = all.filter((q) => q.cat === cat);
       // まだやってないものを優先
@@ -201,7 +214,7 @@
     if (!qs.length) return renderHome();
     round = {
       mode, cat,
-      items: qs.map((q) => ({ q, choices: shuffle([q.a, ...q.w]), firstTime: !isDone(q), answer: null })),
+      items: qs.map((q) => ({ q, choices: shuffle([q.a, ...q.w]), firstTime: !isDone(q), ng: ngOf(data.results[q.id]), weak: isWeak(q), answer: null })),
       idx: 0,
     };
     renderQuestion();
@@ -212,15 +225,15 @@
     const c = catOf(it.q.cat);
     app.innerHTML = `
       <div class="top">
-        <button class="iconbtn" data-act="home">🏠 もどる</button>
+        <button class="iconbtn" data-act="home">${I("home")} もどる</button>
         <div class="progress">${round.items.map((x, i) =>
           `<i class="${x.answer === null ? (i === round.idx ? "now" : "") : x.answer ? "ok" : "ng"}"></i>`).join("")}</div>
         <span class="small">${round.idx + 1}/${round.items.length}</span>
       </div>
       <div class="qcard">
-        <div class="catname">${c.icon} ${esc(c.name)}${it.firstTime ? `<span class="badge new">はじめて</span>` : ""}</div>
+        <div class="catname">${catIcon(c, "sm")} ${esc(c.name)}${it.firstTime ? `<span class="badge new">はじめて</span>` : ""}${it.ng ? `<span class="badge ngc">${I("ng")}${it.ng}かい まちがえた</span>` : ""}</div>
         <div class="qtext">${rich(it.q.q)}</div>
-        <button class="speak" data-act="speak" aria-label="よみあげ">🔊</button>
+        <button class="speak" data-act="speak" aria-label="よみあげ">${I("speaker")}</button>
       </div>
       <div class="choices ${it.choices.some((ch) => [...ch].length > 8) ? "wide" : ""}">
         ${it.choices.map((ch, i) => `<button class="choice" data-act="answer" data-i="${i}">${rich(ch)}</button>`).join("")}
@@ -239,10 +252,15 @@
     it.answer = ok;
 
     const r = data.results[it.q.id] || { n: 0, ok: 0 };
+    r.ng = ngOf(r) + (ok ? 0 : 1);
+    r.streak = ok ? streakOf(r) + 1 : 0;
     r.n += 1;
     if (ok) r.ok += 1;
     r.last = Date.now();
+    if (!ok) r.lastNg = r.last;
     r.lastOk = ok;
+    // にがてを こくふく（2かい つづけて せいかい）
+    it.conquered = it.weak && ok && r.streak >= GRADUATE;
     data.results[it.q.id] = r;
     save();
 
@@ -266,11 +284,12 @@
     judge.innerHTML = `
       <div class="sheet ${ok ? "is-ok" : "is-ng"}">
         <div class="judge">
-          <div class="head"><span class="mark">${ok ? "⭕" : "❌"}</span><span class="msg">${msg}</span></div>
+          <div class="head"><span class="mark">${I(ok ? "ok" : "ng")}</span><span class="msg">${msg}</span></div>
+          ${it.conquered ? `<div class="exp win">${I("crown")} にがてを こくふく！</div>` : it.weak && ok ? `<div class="exp">あと ${GRADUATE - data.results[it.q.id].streak}かい せいかいで にがて こくふく</div>` : ""}
           ${ok ? "" : `<div class="exp ans">こたえは「${rich(it.q.a)}」</div>`}
-          ${it.q.e ? `<div class="exp">💡 ${rich(it.q.e)}</div>` : ""}
+          ${it.q.e ? `<div class="exp">${I("bulb")} ${rich(it.q.e)}</div>` : ""}
         </div>
-        <button class="big primary" data-act="next"><span class="em">${last ? "🏁" : "👉"}</span><span class="grow">${last ? "けっかを みる" : "つぎの もんだい"}</span></button>
+        <button class="big primary" data-act="next"><span class="em">${I(last ? "flag" : "arrow")}</span><span class="grow">${last ? "けっかを みる" : "つぎの もんだい"}</span></button>
       </div>
     `;
     // シートの下に選択肢が隠れないよう余白をとる
@@ -303,13 +322,14 @@
     const left = levelQs().filter((q) => !isDone(q)).length;
     app.innerHTML = `
       <div class="result">
-        <div class="stars">${"⭐".repeat(stars)}${"☆".repeat(3 - stars)}</div>
+        <div class="stars">${I("star").repeat(stars)}${I("starOff").repeat(3 - stars)}</div>
         <div class="score">${total}もん ちゅう ${correct}もん せいかい</div>
         <div class="qtext" style="font-size:24px">${msg}</div>
+        ${round.items.some((x) => x.conquered) ? `<p class="win">${I("crown")} にがてを ${round.items.filter((x) => x.conquered).length}もん こくふく！</p>` : ""}
         <p class="small">${esc(levelOf(data.settings.level).name)}の まだ やってない クイズは あと ${left}もん</p>
       </div>
-      <button class="big primary" data-act="start" data-mode="${round.mode}" ${round.cat ? `data-cat="${round.cat}"` : ""}><span class="em">🔁</span><span class="grow">もういっかい</span></button>
-      <button class="big" data-act="home"><span class="em">🏠</span><span class="grow">はじめに もどる</span></button>
+      <button class="big primary" data-act="start" data-mode="${round.mode}" ${round.cat ? `data-cat="${round.cat}"` : ""}><span class="em">${I("repeat")}</span><span class="grow">もういっかい</span></button>
+      <button class="big" data-act="home"><span class="em">${I("home")}</span><span class="grow">はじめに もどる</span></button>
     `;
     if (data.settings.speak) speak(`${total}もんちゅう、${correct}もん せいかい。${msg}`);
   }
@@ -322,25 +342,38 @@
     const answered = qsLv.map((q) => data.results[q.id]).filter(Boolean);
     const totalN = answered.reduce((s, r) => s + r.n, 0);
     const totalOk = answered.reduce((s, r) => s + r.ok, 0);
-    const modeName = (s) => (s.lv ? levelOf(s.lv).name + "・" : "") + (s.mode === "new" ? "まだやってない" : s.mode === "wrong" ? "リベンジ" : s.mode === "cat" ? catOf(s.cat).name : "ランダム");
+    const totalNg = answered.reduce((s, r) => s + ngOf(r), 0);
+    const weak = qsLv.filter(isWeak).sort(weakSort);
+    const modeName = (s) => (s.lv ? levelOf(s.lv).name + "・" : "") + (s.mode === "new" ? "まだやってない" : s.mode === "wrong" ? "にがて ふくしゅう" : s.mode === "cat" ? catOf(s.cat).name : "ランダム");
 
     app.innerHTML = `
       <div class="top">
-        <button class="iconbtn" data-act="home">🏠 もどる</button>
-        <div class="title" style="font-size:24px">📒 きろく</div>
+        <button class="iconbtn" data-act="home">${I("home")} もどる</button>
+        <div class="title" style="font-size:24px">${I("book")} きろく</div>
       </div>
       ${levelTabs()}
       <div class="panel stats">
         <div><b>${done.length}<small style="font-size:16px">/${qsLv.length}</small></b><span>やった クイズ</span></div>
         <div><b>${totalN}</b><span>こたえた かいすう</span></div>
         <div><b>${totalN ? Math.round((totalOk / totalN) * 100) : 0}%</b><span>せいかいりつ</span></div>
+        <div><b>${totalNg}</b><span>まちがえた かいすう</span></div>
+      </div>
+
+      <div class="panel">
+        <div class="ph">${I("target")} にがてな もんだい <span class="small">${weak.length}もん</span></div>
+        ${weak.length ? `<ul class="qlist">${weak.slice(0, 10).map((q) => `
+          <li><span class="st ngn">${I("ng")}${ngOf(data.results[q.id])}</span><span class="tx">${rich(q.q)}</span>
+          <span class="meta">${esc(catOf(q.cat).name)}</span></li>`).join("")}</ul>
+          <p class="small">まちがえた かいすうが おおい じゅん。2かい つづけて せいかいすると「にがて」から はずれます。</p>
+          <button class="big primary" data-act="start" data-mode="wrong"><span class="em">${I("target")}</span><span class="grow">にがてを ふくしゅう する</span></button>`
+        : `<p class="small">いまは ないよ。まちがえた もんだいは ここに たまります。</p>`}
       </div>
 
       <div class="panel">
         <details>
-          <summary>🕒 さいきん あそんだ きろく</summary>
+          <summary>${I("clock")} さいきん あそんだ きろく</summary>
           ${data.sessions.length ? `<ul class="qlist">${data.sessions.slice(0, 30).map((s) => `
-            <li><span class="st">${s.correct === s.total ? "⭐" : ""}</span>
+            <li><span class="st">${s.correct === s.total ? I("star", "gold") : ""}</span>
             <span class="tx">${esc(modeName(s))}：${s.total}もん ちゅう ${s.correct}もん</span>
             <span class="meta">${fmtDate(s.at)}</span></li>`).join("")}</ul>` : `<p class="small">まだ ないよ</p>`}
         </details>
@@ -351,17 +384,17 @@
         if (!qs.length) return "";
         const d = qs.filter(isDone).length;
         return `<div class="panel"><details>
-          <summary>${c.icon} ${esc(c.name)}　<span class="small">${d} / ${qs.length}</span></summary>
+          <summary>${catIcon(c, "sm")} ${esc(c.name)}　<span class="small">${d} / ${qs.length}</span></summary>
           <ul class="qlist">${qs.map((q) => {
             const r = data.results[q.id];
-            const st = !r ? `<span class="badge">まだ</span>` : r.lastOk ? `<span style="color:var(--ok)">⭕</span>` : `<span style="color:var(--ng)">❌</span>`;
+            const st = !r ? `<span class="badge">まだ</span>` : r.lastOk ? `<span class="okc">${I("ok")}</span>` : `<span class="ngc2">${I("ng")}</span>`;
             return `<li><span class="st">${st}</span><span class="tx">${rich(q.q)}</span>
-              <span class="meta">${r ? `${r.ok}/${r.n}かい<br>${fmtDate(r.last)}` : ""}</span></li>`;
+              <span class="meta">${r ? `<span class="okc">${I("ok")}${r.ok}</span> <span class="ngc2">${I("ng")}${ngOf(r)}</span><br>${fmtDate(r.last)}` : ""}</span></li>`;
           }).join("")}</ul>
         </details></div>`;
       }).join("")}
 
-      <h2>⚙️ せってい（おうちの かたへ）</h2>
+      <h2>${I("sliders")} せってい（おうちの かたへ）</h2>
       <div class="panel">
         <label class="opt"><input type="checkbox" data-set="speak" ${data.settings.speak ? "checked" : ""}> もんだいを よみあげる</label>
         <label class="opt">1かいの もんだいすう
@@ -369,9 +402,9 @@
         </label>
         <p class="small">きろくは この ブラウザに ほぞん されます。べつの たんまつに うつすときは「かきだし」→「よみこみ」を つかってください。</p>
         <div class="row">
-          <button class="btn" data-act="export">⬇️ きろくを かきだし</button>
-          <button class="btn" data-act="import">⬆️ きろくを よみこみ</button>
-          <button class="btn danger" data-act="reset">🗑️ きろくを けす</button>
+          <button class="btn" data-act="export">${I("download")} きろくを かきだし</button>
+          <button class="btn" data-act="import">${I("upload")} きろくを よみこみ</button>
+          <button class="btn danger" data-act="reset">${I("trash")} きろくを けす</button>
         </div>
         <input type="file" id="importFile" accept="application/json,.json" hidden>
       </div>

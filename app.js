@@ -11,7 +11,7 @@
   // results:  { [quizId]: { n: 回答回数, ok: 正解回数, last: 最終日時(ms), lastOk: 最後に正解したか } }
   // sessions: [{ at, mode, total, correct }]  （新しい順・最大100件）
   // seen:     ホームを最後に開いたときに存在したクイズID（「あたらしく ふえた」表示用）
-  const defaults = () => ({ results: {}, sessions: [], seen: null, settings: { speak: true, perRound: 5, level: "k" } });
+  const defaults = () => ({ results: {}, sessions: [], seen: null, settings: { speak: true, perRound: 5, level: "k", voice: "", rate: 0.95 } });
 
   function load() {
     try {
@@ -93,28 +93,52 @@
 
   // 英語の 部分は 英語の 声で、それ以外は 日本語の 声で 読む
   const EN_PART = /([A-Za-z][A-Za-z0-9'’ .,!?-]*[A-Za-z.!?]|[A-Za-z])/;
+  // 声えらび：設定で えらんだ 声 → なければ 端末の 中で いちばん 自然そうな 声
+  // （ニューラル・拡張・高品質の 声を 優先。Edge の Natural、iPhone の Kyoko（拡張）など）
+  const VOICE_SCORE = [[/natural|neural|online/i, 50], [/premium|enhanced|拡張|高品質/i, 40], [/google/i, 30], [/siri/i, 25],
+    [/nanami|kyoko|o-ren|otoya|hattori|keita|ayumi|haruka/i, 5]];
+  const scoreVoice = (v) => VOICE_SCORE.reduce((s, [re, p]) => s + (re.test(v.name) ? p : 0), v.localService ? 0 : 1);
+  function voicesFor(lang) {
+    const two = lang.slice(0, 2);
+    return speechSynthesis.getVoices().filter((v) => v.lang && v.lang.replace("_", "-").toLowerCase().startsWith(two));
+  }
   function voiceFor(lang) {
-    const vs = speechSynthesis.getVoices();
-    return vs.find((v) => v.lang && v.lang.replace("_", "-").startsWith(lang)) ||
-      vs.find((v) => v.lang && v.lang.startsWith(lang.slice(0, 2)));
+    const vs = voicesFor(lang);
+    if (lang.startsWith("ja") && data.settings.voice) {
+      const chosen = vs.find((v) => v.name === data.settings.voice);
+      if (chosen) return chosen;
+    }
+    const exact = vs.filter((v) => v.lang.replace("_", "-") === lang);
+    return (exact.length ? exact : vs).slice().sort((a, b) => scoreVoice(b) - scoreVoice(a))[0];
   }
-  function speak(text) {
+  let speakTimer = null;
+  function stopSpeak() {
+    clearTimeout(speakTimer);
+    if (window.speechSynthesis) speechSynthesis.cancel();
+  }
+  // delay：画面が 出てから 一拍 おいて 読む（ミリ秒）
+  function speak(text, delay) {
     if (!("speechSynthesis" in window)) return;
-    try {
-      speechSynthesis.cancel();
-      plain(text).split(EN_PART).forEach((part, i) => {
-        if (!part.trim()) return;
-        const en = i % 2 === 1;
-        const u = new SpeechSynthesisUtterance(part);
-        u.lang = en ? "en-US" : "ja-JP";
-        u.rate = en ? 0.8 : 0.9;
-        u.pitch = en ? 1 : 1.1;
-        const v = voiceFor(u.lang);
-        if (v) u.voice = v;
-        speechSynthesis.speak(u);
-      });
-    } catch (e) { /* noop */ }
+    stopSpeak();
+    speakTimer = setTimeout(() => {
+      try {
+        const rate = data.settings.rate || 0.95;
+        plain(text).split(EN_PART).forEach((part, i) => {
+          if (!part.trim()) return;
+          const en = i % 2 === 1;
+          const u = new SpeechSynthesisUtterance(part);
+          u.lang = en ? "en-US" : "ja-JP";
+          u.rate = en ? rate * 0.85 : rate;
+          u.pitch = 1;
+          const v = voiceFor(u.lang);
+          if (v) u.voice = v;
+          speechSynthesis.speak(u);
+        });
+      } catch (e) { /* noop */ }
+    }, delay || 0);
   }
+  const DELAY_Q = 700;    // 問題を 出してから
+  const DELAY_JUDGE = 450; // ピンポンの 音の あと
 
   let audioCtx = null;
   function beep(ok) {
@@ -178,7 +202,7 @@
           if (!cqs.length) return "";
           const done = cqs.filter(isDone).length;
           const left = cqs.length - done;
-          return `<button class="cat" style="--c:${c.color}" data-act="start" data-mode="cat" data-cat="${c.id}">
+          return `<button class="cat" style="--c:${c.color}" data-act="list" data-cat="${c.id}">
             ${left ? `<span class="badge">のこり${left}</span>` : `<span class="badge done">${I("crown")}</span>`}
             ${catIcon(c, "big")}
             <span class="nm">${esc(c.name)}</span>
@@ -225,7 +249,7 @@
     const c = catOf(it.q.cat);
     app.innerHTML = `
       <div class="top">
-        <button class="iconbtn" data-act="home">${I("home")} もどる</button>
+        <button class="iconbtn" data-act="${round.single ? "back" : "home"}">${I("home")} もどる</button>
         <div class="progress">${round.items.map((x, i) =>
           `<i class="${x.answer === null ? (i === round.idx ? "now" : "") : x.answer ? "ok" : "ng"}"></i>`).join("")}</div>
         <span class="small">${round.idx + 1}/${round.items.length}</span>
@@ -241,7 +265,7 @@
       <div id="judge"></div>
     `;
     app.style.paddingBottom = "";
-    if (data.settings.speak) speak(it.q.say || it.q.q);
+    if (data.settings.speak) speak(it.q.say || it.q.q, DELAY_Q);
   }
 
   function answer(i) {
@@ -289,15 +313,16 @@
           ${ok ? "" : `<div class="exp ans">こたえは「${rich(it.q.a)}」</div>`}
           ${it.q.e ? `<div class="exp">${I("bulb")} ${rich(it.q.e)}</div>` : ""}
         </div>
-        <button class="big primary" data-act="next"><span class="em">${I(last ? "flag" : "arrow")}</span><span class="grow">${last ? "けっかを みる" : "つぎの もんだい"}</span></button>
+        <button class="big primary" data-act="next"><span class="em">${I(round.single ? "list" : last ? "flag" : "arrow")}</span><span class="grow">${round.single ? "いちらんに もどる" : last ? "けっかを みる" : "つぎの もんだい"}</span></button>
       </div>
     `;
     // シートの下に選択肢が隠れないよう余白をとる
     app.style.paddingBottom = judge.firstElementChild.offsetHeight + 16 + "px";
-    if (data.settings.speak) speak(ok ? msg + (it.q.e ? "。" + it.q.e : "") : `${msg}。こたえは、${it.q.a}。${it.q.e || ""}`);
+    if (data.settings.speak) speak(ok ? msg + (it.q.e ? "。" + it.q.e : "") : `${msg}。こたえは、${it.q.a}。${it.q.e || ""}`, DELAY_JUDGE);
   }
 
   function next() {
+    if (round.single) return goBack();
     if (round.idx < round.items.length - 1) {
       round.idx += 1;
       renderQuestion();
@@ -331,7 +356,78 @@
       <button class="big primary" data-act="start" data-mode="${round.mode}" ${round.cat ? `data-cat="${round.cat}"` : ""}><span class="em">${I("repeat")}</span><span class="grow">もういっかい</span></button>
       <button class="big" data-act="home"><span class="em">${I("home")}</span><span class="grow">はじめに もどる</span></button>
     `;
-    if (data.settings.speak) speak(`${total}もんちゅう、${correct}もん せいかい。${msg}`);
+    if (data.settings.speak) speak(`${total}もんちゅう、${correct}もん せいかい。${msg}`, DELAY_JUDGE);
+  }
+
+  function voiceOptions() {
+    if (!("speechSynthesis" in window)) return `<option value="">（よみあげ できません）</option>`;
+    const vs = voicesFor("ja-JP").slice().sort((a, b) => scoreVoice(b) - scoreVoice(a));
+    const best = vs[0];
+    return `<option value="">じどう（${esc(best ? best.name : "ひょうじゅん")}）</option>` +
+      vs.map((v) => `<option value="${esc(v.name)}" ${v.name === data.settings.voice ? "selected" : ""}>${esc(v.name)}</option>`).join("");
+  }
+
+  // ---------- 画面: テーマの もんだい いちらん（1もんずつ えらべる） ----------
+  let listView = { cat: null, filter: "all", scroll: 0 };
+  function renderList(catId, filter) {
+    window.QUIZ_PLAYING = false;
+    app.style.paddingBottom = "";
+    listView.cat = catId;
+    listView.filter = filter || listView.filter || "all";
+    const c = catOf(catId);
+    const all = levelQs().filter((q) => q.cat === catId);
+    const counts = { all: all.length, new: all.filter((q) => !isDone(q)).length, weak: all.filter(isWeak).length };
+    const shown = listView.filter === "new" ? all.filter((q) => !isDone(q)) : listView.filter === "weak" ? all.filter(isWeak).sort(weakSort) : all;
+    const tab = (k, label) => `<button class="ftab ${listView.filter === k ? "on" : ""}" data-act="filter" data-f="${k}">${label} <b>${counts[k]}</b></button>`;
+    app.innerHTML = `
+      <div class="top">
+        <button class="iconbtn" data-act="home">${I("home")} もどる</button>
+        <div class="title" style="font-size:20px">${catIcon(c, "sm")} ${esc(c.name)}</div>
+      </div>
+      <button class="big primary" data-act="start" data-mode="cat" data-cat="${c.id}">
+        <span class="em">${I("arrow")}</span><span class="grow">このテーマで ${data.settings.perRound}もん<small>まだ やってない もんだいから</small></span>
+      </button>
+      <h2>もんだいを えらんで 1もん</h2>
+      <div class="ftabs">${tab("all", "ぜんぶ")}${tab("new", "まだ")}${tab("weak", "にがて")}</div>
+      ${shown.length ? `<ul class="qlist pick">${shown.map((q) => qItem(q)).join("")}</ul>` : `<p class="small">ここには もんだいが ないよ。</p>`}
+    `;
+  }
+  // いちらんの 1ぎょう（おすと その もんだいを 1もん だけ とく）
+  function qItem(q, meta) {
+    const r = data.results[q.id];
+    const st = !r ? `<span class="badge">まだ</span>` : r.lastOk ? `<span class="okc">${I("ok")}</span>` : `<span class="ngc2">${I("ng")}</span>`;
+    const m = meta != null ? meta : r ? `<span class="okc">${I("ok")}${r.ok}</span> <span class="ngc2">${I("ng")}${ngOf(r)}</span>` : "";
+    return `<li data-act="one" data-id="${q.id}" role="button" tabindex="0"><span class="st">${st}</span><span class="tx">${rich(q.q)}</span>
+      <span class="meta">${m}</span><span class="go">${I("arrow")}</span></li>`;
+  }
+
+  // 1もんだけ とく。おわったら もとの がめんに もどる
+  function startOne(id, back) {
+    const q = QUIZZES.find((x) => x.id === id);
+    if (!q) return;
+    window.QUIZ_PLAYING = true;
+    round = {
+      mode: "one", single: true, back, backScroll: window.scrollY,
+      backOpen: [...app.querySelectorAll("details")].map((d) => d.open),
+      items: [{ q, choices: shuffle([q.a, ...q.w]), firstTime: !isDone(q), ng: ngOf(data.results[q.id]), weak: isWeak(q), answer: null }],
+      idx: 0,
+    };
+    renderQuestion();
+    window.scrollTo(0, 0);
+  }
+  function goBack() {
+    stopSpeak();
+    const b = round && round.back;
+    const y = round ? round.backScroll : 0;
+    if (b === "history") {
+      renderHistory();
+      // ひらいていた ところを ひらいた まま もどす
+      const open = (round && round.backOpen) || [];
+      app.querySelectorAll("details").forEach((d, i) => { if (open[i]) d.open = true; });
+    }
+    else if (b === "list") renderList(listView.cat, listView.filter);
+    else renderHome();
+    window.scrollTo(0, y || 0);
   }
 
   // ---------- 画面: きろく ----------
@@ -361,9 +457,9 @@
 
       <div class="panel">
         <div class="ph">${I("target")} にがてな もんだい <span class="small">${weak.length}もん</span></div>
-        ${weak.length ? `<ul class="qlist">${weak.slice(0, 10).map((q) => `
-          <li><span class="st ngn">${I("ng")}${ngOf(data.results[q.id])}</span><span class="tx">${rich(q.q)}</span>
-          <span class="meta">${esc(catOf(q.cat).name)}</span></li>`).join("")}</ul>
+        ${weak.length ? `<ul class="qlist pick" data-back="history">${weak.slice(0, 10).map((q) => `
+          <li data-act="one" data-id="${q.id}" role="button" tabindex="0"><span class="st ngn">${I("ng")}${ngOf(data.results[q.id])}</span><span class="tx">${rich(q.q)}</span>
+          <span class="meta">${esc(catOf(q.cat).name)}</span><span class="go">${I("arrow")}</span></li>`).join("")}</ul>
           <p class="small">まちがえた かいすうが おおい じゅん。2かい つづけて せいかいすると「にがて」から はずれます。</p>
           <button class="big primary" data-act="start" data-mode="wrong"><span class="em">${I("target")}</span><span class="grow">にがてを ふくしゅう する</span></button>`
         : `<p class="small">いまは ないよ。まちがえた もんだいは ここに たまります。</p>`}
@@ -385,11 +481,9 @@
         const d = qs.filter(isDone).length;
         return `<div class="panel"><details>
           <summary>${catIcon(c, "sm")} ${esc(c.name)}　<span class="small">${d} / ${qs.length}</span></summary>
-          <ul class="qlist">${qs.map((q) => {
+          <ul class="qlist pick" data-back="history">${qs.map((q) => {
             const r = data.results[q.id];
-            const st = !r ? `<span class="badge">まだ</span>` : r.lastOk ? `<span class="okc">${I("ok")}</span>` : `<span class="ngc2">${I("ng")}</span>`;
-            return `<li><span class="st">${st}</span><span class="tx">${rich(q.q)}</span>
-              <span class="meta">${r ? `<span class="okc">${I("ok")}${r.ok}</span> <span class="ngc2">${I("ng")}${ngOf(r)}</span><br>${fmtDate(r.last)}` : ""}</span></li>`;
+            return qItem(q, r ? `<span class="okc">${I("ok")}${r.ok}</span> <span class="ngc2">${I("ng")}${ngOf(r)}</span><br>${fmtDate(r.last)}` : "");
           }).join("")}</ul>
         </details></div>`;
       }).join("")}
@@ -397,6 +491,14 @@
       <h2>${I("sliders")} せってい（おうちの かたへ）</h2>
       <div class="panel">
         <label class="opt"><input type="checkbox" data-set="speak" ${data.settings.speak ? "checked" : ""}> もんだいを よみあげる</label>
+        <label class="opt">こえ
+          <select data-set="voice" data-type="str">${voiceOptions()}</select>
+        </label>
+        <label class="opt">よむ はやさ
+          <select data-set="rate">${[[0.8, "ゆっくり"], [0.95, "ふつう"], [1.1, "はやい"]].map(([v, n]) => `<option value="${v}" ${v === data.settings.rate ? "selected" : ""}>${n}</option>`).join("")}</select>
+          <button class="btn" data-act="testvoice">${I("speaker")} ためしに よむ</button>
+        </label>
+        <p class="small">しぜんな こえに するには：iPhone・iPad は「設定 › アクセシビリティ › 読み上げコンテンツ › 声 › 日本語」で「拡張」や「高品質」の 声を ダウンロード。Windows は Edge で ひらくと「Natural」の 声が つかえます。えらんだ こえは この たんまつに ほぞん されます。</p>
         <label class="opt">1かいの もんだいすう
           <select data-set="perRound">${[3, 5, 10].map((n) => `<option ${n === data.settings.perRound ? "selected" : ""}>${n}</option>`).join("")}</select>
         </label>
@@ -449,12 +551,17 @@
     const el = ev.target.closest("[data-act]");
     if (!el) return;
     const act = el.dataset.act;
-    if (act === "home") { if (window.speechSynthesis) speechSynthesis.cancel(); renderHome(); window.scrollTo(0, 0); }
+    if (act === "home") { stopSpeak(); renderHome(); window.scrollTo(0, 0); }
     else if (act === "history") { renderHistory(); window.scrollTo(0, 0); }
     else if (act === "start") { startRound(el.dataset.mode, el.dataset.cat); window.scrollTo(0, 0); }
     else if (act === "answer") answer(Number(el.dataset.i));
     else if (act === "next") next();
     else if (act === "speak") speak(round.items[round.idx].q.say || round.items[round.idx].q.q);
+    else if (act === "list") { renderList(el.dataset.cat, "all"); window.scrollTo(0, 0); }
+    else if (act === "filter") renderList(listView.cat, el.dataset.f);
+    else if (act === "one") startOne(el.dataset.id, el.closest("[data-back]") ? el.closest("[data-back]").dataset.back : "list");
+    else if (act === "back") goBack();
+    else if (act === "testvoice") speak("こんにちは。なにかな クイズ です。りんご は えいごで apple。", 0);
     else if (act === "level") {
       data.settings.level = el.dataset.lv;
       save();
@@ -477,7 +584,7 @@
   app.addEventListener("change", (ev) => {
     const key = ev.target.dataset.set;
     if (!key) return;
-    data.settings[key] = ev.target.type === "checkbox" ? ev.target.checked : Number(ev.target.value);
+    data.settings[key] = ev.target.type === "checkbox" ? ev.target.checked : ev.target.dataset.type === "str" ? ev.target.value : Number(ev.target.value);
     save();
   });
 

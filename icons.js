@@ -44,6 +44,7 @@
     upload: `<path d="M12 20V9M7 13.5l5-5 5 5M5 4h14"/>`,
     trash: `<path d="M4 7h16M9.5 7V4.5h5V7M6 7l1 13h10l1-13M10 11v5.5M14 11v5.5"/>`,
     bulb: `<path d="M9 18h6M10 21h4"/><path d="M12 3a6 6 0 0 0-3.6 10.8c.7.6 1.1 1.3 1.1 2.2h5c0-.9.4-1.6 1.1-2.2A6 6 0 0 0 12 3z"/>`,
+    list: `<path d="M9 6h11M9 12h11M9 18h11"/><circle cx="4.5" cy="6" r="1.3" ${F}/><circle cx="4.5" cy="12" r="1.3" ${F}/><circle cx="4.5" cy="18" r="1.3" ${F}/>`,
     target: `<circle cx="12" cy="12" r="8.5"/><circle cx="12" cy="12" r="4.5"/><circle cx="12" cy="12" r="1.2" ${F}/>`,
   };
   const svg = (name, cls) =>

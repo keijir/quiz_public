@@ -216,3 +216,18 @@ html, body { overflow-x: hidden; overflow-x: clip; }
 .ci.big .ic { width: 34px; height: 34px; }
 .ci.sm .ic { width: 16px; height: 16px; }
 .stats span { font-size: 12px; line-height: 1.3; display: block; }
+
+/* ---- もんだい いちらん（1もんずつ えらぶ） ---- */
+.ftabs { display: flex; gap: 6px; margin: 4px 0 8px; }
+.ftab { flex: 1; background: var(--card); border-radius: 12px; padding: 8px 4px; font-size: 15px; font-weight: 700; box-shadow: 0 3px 0 var(--line); border: 3px solid transparent; }
+.ftab.on { border-color: var(--accent); background: #fff0e3; }
+.ftab b { color: var(--sub); font-size: 13px; }
+.qlist.pick li { cursor: pointer; align-items: center; border-radius: 10px; }
+.qlist.pick li:active { background: #fff4d6; }
+.qlist.pick .go { color: var(--line); flex: none; }
+.qlist.pick .go .ic { width: 18px; height: 18px; color: #d9c9a3; }
+.qlist.pick .tx { white-space: pre-line; }
+label.opt .btn { margin-left: auto; padding: 6px 12px; font-size: 14px; }
+label.opt select { max-width: 60%; }
+.qlist .st { width: 46px; }
+.qlist .st .badge { white-space: nowrap; padding: 2px 7px; font-size: 12px; }

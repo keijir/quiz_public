@@ -94,6 +94,7 @@
   // ---------- 画面: ホーム ----------
   function renderHome() {
     window.QUIZ_PLAYING = false;
+    app.style.paddingBottom = "";
     const qs = levelQs();
     const total = qs.length;
     const notDone = qs.filter((q) => !isDone(q));
@@ -179,20 +180,21 @@
     app.innerHTML = `
       <div class="top">
         <button class="iconbtn" data-act="home">🏠 もどる</button>
-        <span class="small">${round.idx + 1} / ${round.items.length}もんめ</span>
+        <div class="progress">${round.items.map((x, i) =>
+          `<i class="${x.answer === null ? (i === round.idx ? "now" : "") : x.answer ? "ok" : "ng"}"></i>`).join("")}</div>
+        <span class="small">${round.idx + 1}/${round.items.length}</span>
       </div>
-      <div class="progress">${round.items.map((x, i) =>
-        `<i class="${x.answer === null ? (i === round.idx ? "now" : "") : x.answer ? "ok" : "ng"}"></i>`).join("")}</div>
       <div class="qcard">
         <div class="catname">${c.icon} ${esc(c.name)}${it.firstTime ? `<span class="badge new">はじめて</span>` : ""}</div>
         <div class="qtext">${esc(it.q.q)}</div>
         <button class="speak" data-act="speak" aria-label="よみあげ">🔊</button>
       </div>
-      <div class="choices">
+      <div class="choices ${it.choices.some((ch) => [...ch].length > 8) ? "wide" : ""}">
         ${it.choices.map((ch, i) => `<button class="choice" data-act="answer" data-i="${i}">${esc(ch)}</button>`).join("")}
       </div>
       <div id="judge"></div>
     `;
+    app.style.paddingBottom = "";
     if (data.settings.speak) speak(it.q.say || it.q.q);
   }
 
@@ -226,17 +228,21 @@
     const last = round.idx === round.items.length - 1;
     const praise = ["せいかい！", "すごい！", "やったね！", "ピンポーン！", "てんさい！"];
     const msg = ok ? praise[Math.floor(Math.random() * praise.length)] : "ざんねん！";
-    document.getElementById("judge").innerHTML = `
-      <div class="judge">
-        <div class="mark">${ok ? "⭕" : "❌"}</div>
-        <div class="msg" style="color:${ok ? "var(--ok)" : "var(--ng)"}">${msg}</div>
-        ${ok ? "" : `<div class="exp">こたえは「${esc(it.q.a)}」</div>`}
-        ${it.q.e ? `<div class="exp">💡 ${esc(it.q.e)}</div>` : ""}
+    // 判定は画面下に固定して、スクロールしなくても「つぎへ」が押せるようにする
+    const judge = document.getElementById("judge");
+    judge.innerHTML = `
+      <div class="sheet ${ok ? "is-ok" : "is-ng"}">
+        <div class="judge">
+          <div class="head"><span class="mark">${ok ? "⭕" : "❌"}</span><span class="msg">${msg}</span></div>
+          ${ok ? "" : `<div class="exp ans">こたえは「${esc(it.q.a)}」</div>`}
+          ${it.q.e ? `<div class="exp">💡 ${esc(it.q.e)}</div>` : ""}
+        </div>
+        <button class="big primary" data-act="next"><span class="em">${last ? "🏁" : "👉"}</span><span class="grow">${last ? "けっかを みる" : "つぎの もんだい"}</span></button>
       </div>
-      <button class="big primary" data-act="next"><span class="em">${last ? "🏁" : "👉"}</span><span class="grow">${last ? "けっかを みる" : "つぎの もんだい"}</span></button>
     `;
+    // シートの下に選択肢が隠れないよう余白をとる
+    app.style.paddingBottom = judge.firstElementChild.offsetHeight + 16 + "px";
     if (data.settings.speak) speak(ok ? msg + (it.q.e ? "。" + it.q.e : "") : `${msg}。こたえは、${it.q.a}。${it.q.e || ""}`);
-    document.getElementById("judge").scrollIntoView({ behavior: "smooth", block: "nearest" });
   }
 
   function next() {
@@ -251,6 +257,7 @@
 
   function renderResult() {
     window.QUIZ_PLAYING = false;
+    app.style.paddingBottom = "";
     const total = round.items.length;
     const correct = round.items.filter((x) => x.answer).length;
     data.sessions.unshift({ at: Date.now(), lv: data.settings.level, mode: round.mode, cat: round.cat || null, total, correct });

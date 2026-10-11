@@ -231,3 +231,16 @@ label.opt .btn { margin-left: auto; padding: 6px 12px; font-size: 14px; }
 label.opt select { max-width: 60%; }
 .qlist .st { width: 46px; }
 .qlist .st .badge { white-space: nowrap; padding: 2px 7px; font-size: 12px; }
+
+/* ホーム：おすすめの 下の 3つの ボタン */
+.minis { display: grid; grid-template-columns: repeat(3, 1fr); gap: 10px; margin: 4px 0 10px; }
+.mini {
+  display: flex; flex-direction: column; align-items: center; gap: 2px; min-height: 84px;
+  background: var(--card); border-radius: var(--radius); padding: 10px 4px 8px;
+  font-size: 18px; font-weight: 700; box-shadow: 0 5px 0 var(--line);
+}
+.mini:active { transform: translateY(3px); box-shadow: 0 2px 0 var(--line); }
+.mini .ic { width: 28px; height: 28px; color: var(--accent); }
+.mini small { font-size: 13px; color: var(--sub); font-weight: 500; white-space: nowrap; }
+.mini[disabled] { opacity: .45; pointer-events: none; }
+.stats .sub { grid-column: 1 / -1; margin: 6px 0 0; }

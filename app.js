@@ -8,17 +8,46 @@
   const app = document.getElementById("app");
 
   // ---------- 保存データ ----------
-  // results:  { [quizId]: { n: 回答回数, ok: 正解回数, last: 最終日時(ms), lastOk: 最後に正解したか } }
+  // results:  { [quizId]: { n: 回答回数, ok: 正解回数, ng: まちがえた回数, streak: つづけて正解した回数,
+  //              last / lastNg: 最終日時(ms), lastOk: 最後に正解したか,
+  //              first: 1・0（はじめて とき 正解したか。ふくしゅうでの 正解と 分ける）, h: "1101"（さいきんの 結果。最大 HIST 件） } }
+  // ※ 問題データ（quizzes*.js）と 記録は 分けて もち、問題の id だけで つなぐ
   // sessions: [{ at, mode, total, correct }]  （新しい順・最大100件）
   // seen:     ホームを最後に開いたときに存在したクイズID（「あたらしく ふえた」表示用）
   const defaults = () => ({ results: {}, sessions: [], seen: null, settings: { speak: true, perRound: 5, level: "k", voice: "", rate: 0.95 } });
 
+  const HIST = 10;
+  // 保存データ・よみこんだ ファイルを 点検して、こわれた ところは すてる（形が ちがえば null）
+  function sanitize(d) {
+    const obj = (x) => x && typeof x === "object" && !Array.isArray(x);
+    if (!obj(d) || !obj(d.results)) return null;
+    const cnt = (x) => (Number.isFinite(x) && x >= 0 ? Math.floor(x) : null);
+    const results = {};
+    for (const [id, r] of Object.entries(d.results)) {
+      if (!obj(r)) continue;
+      const n = cnt(r.n), ok = cnt(r.ok);
+      if (!n || ok == null || ok > n) continue;
+      const x = { n, ok, last: cnt(r.last) || 0, lastOk: !!r.lastOk };
+      if (cnt(r.ng) != null) x.ng = Math.min(cnt(r.ng), n);
+      if (cnt(r.streak) != null) x.streak = Math.min(cnt(r.streak), n);
+      if (cnt(r.lastNg)) x.lastNg = cnt(r.lastNg);
+      if (r.first === 0 || r.first === 1) x.first = r.first;
+      if (typeof r.h === "string" && /^[01]*$/.test(r.h)) x.h = r.h.slice(-HIST);
+      results[id] = x;
+    }
+    const sessions = Array.isArray(d.sessions) ? d.sessions.filter((s) => obj(s) && cnt(s.total) && cnt(s.correct) != null && s.correct <= s.total).slice(0, 100) : [];
+    const seen = Array.isArray(d.seen) ? d.seen.filter((x) => typeof x === "string") : null;
+    const def = defaults().settings, st = obj(d.settings) ? d.settings : {};
+    const settings = { ...def };
+    for (const k of Object.keys(def)) if (typeof st[k] === typeof def[k]) settings[k] = st[k];
+    if (!LEVELS.some((l) => l.id === settings.level)) settings.level = def.level;
+    if (![3, 5, 10].includes(settings.perRound)) settings.perRound = def.perRound;
+    return { results, sessions, seen, settings };
+  }
   function load() {
     try {
       const raw = localStorage.getItem(STORE_KEY);
-      if (!raw) return defaults();
-      const d = JSON.parse(raw);
-      return { ...defaults(), ...d, settings: { ...defaults().settings, ...(d.settings || {}) } };
+      return (raw && sanitize(JSON.parse(raw))) || defaults();
     } catch (e) {
       return defaults();
     }
@@ -42,6 +71,8 @@
     return ngOf(rb) - ngOf(ra) || (rb.lastNg || rb.last || 0) - (ra.lastNg || ra.last || 0);
   };
   const lvOf = (q) => q.lv || "k";
+  // 知識の まとまり（類題を さがす ため）：生成した 問題は 単元コード、手書きの 問題は 学年＋テーマ
+  const knowOf = (q) => q.unit || `${lvOf(q)}:${q.cat}`;
   const levelOf = (id) => LEVELS.find((l) => l.id === id) || LEVELS[0];
   // いま えらんでいる がくねんの クイズ
   const levelQs = () => QUIZZES.filter((q) => lvOf(q) === data.settings.level);
@@ -166,9 +197,9 @@
     window.QUIZ_PLAYING = false;
     app.style.paddingBottom = "";
     const qs = levelQs();
-    const total = qs.length;
-    const notDone = qs.filter((q) => !isDone(q));
-    const weak = qs.filter(isWeak);
+    const cnt = countsOf(qs);
+    const todayWeak = Math.min(2, cnt.weak, data.settings.perRound - 1);
+    const todayNew = Math.min(cnt.notDone, data.settings.perRound - todayWeak);
     const known = data.seen ? new Set(data.seen) : null;
     const added = known ? QUIZZES.filter((q) => !known.has(q.id)) : [];
     const addedByLv = LEVELS.map((l) => [l, added.filter((q) => lvOf(q) === l.id).length]).filter(([, n]) => n);
@@ -183,18 +214,15 @@
       </div>
       ${levelTabs()}
       ${added.length ? `<div class="panel">${I("sparkle", "accent")} あたらしい クイズが <b>${added.length}もん</b> ふえたよ！<br><span class="small">${addedByLv.map(([l, n]) => `${esc(l.name)} ${n}もん`).join("・")}</span></div>` : ""}
-      <button class="big primary" data-act="start" data-mode="new" ${notDone.length ? "" : "disabled"}>
+      <button class="big primary" data-act="start" data-mode="today">
         <span class="em">${I("sparkle")}</span>
-        <span class="grow">まだ やってない クイズ<small>${notDone.length ? `のこり ${notDone.length}もん` : "ぜんぶ やったよ！すごい！"}</small></span>
+        <span class="grow">きょうの おすすめ ${data.settings.perRound}もん<small>${[todayWeak && `にがて ${todayWeak}`, todayNew && `はじめて ${todayNew}`, data.settings.perRound - todayWeak - todayNew > 0 && `ふくしゅう ${data.settings.perRound - todayWeak - todayNew}`].filter(Boolean).join("・")}</small></span>
       </button>
-      <button class="big" data-act="start" data-mode="random">
-        <span class="em">${I("dice")}</span>
-        <span class="grow">ぜんぶから ランダム<small>${total}もんの なかから</small></span>
-      </button>
-      <button class="big" data-act="start" data-mode="wrong" ${weak.length ? "" : "disabled"}>
-        <span class="em">${I("target")}</span>
-        <span class="grow">にがて クイズ<small>${weak.length ? `${weak.length}もん・まちがえた かいすうが おおい じゅん` : "いまは ないよ"}</small></span>
-      </button>
+      <div class="minis">
+        <button class="mini" data-act="start" data-mode="new" ${cnt.notDone ? "" : "disabled"}>${I("star")}<b>まだ</b><small>${cnt.notDone ? `のこり ${cnt.notDone}` : "ぜんぶ やった！"}</small></button>
+        <button class="mini" data-act="start" data-mode="random">${I("dice")}<b>ランダム</b><small>${cnt.total}もんから</small></button>
+        <button class="mini" data-act="start" data-mode="wrong" ${cnt.weak ? "" : "disabled"}>${I("target")}<b>にがて</b><small>${cnt.weak ? `${cnt.weak}もん` : "いまは ないよ"}</small></button>
+      </div>
       <h2>テーマで えらぶ</h2>
       <div class="grid">
         ${CATS.map((c) => {
@@ -222,7 +250,12 @@
     const all = levelQs();
     let pool;
     if (mode === "new") pool = all.filter((q) => !isDone(q));
-    else if (mode === "wrong") return shuffle(all.filter(isWeak).sort(weakSort).slice(0, n)); // まちがえた 回数が 多い ものから
+    else if (mode === "wrong") {
+      // まちがえた 回数が 多い ものから。たりない ぶんは にがての 類題（おなじ 単元）で うめる
+      const weak = all.filter(isWeak).sort(weakSort).slice(0, n);
+      return shuffle([...weak, ...similar(weak, n - weak.length)]);
+    }
+    else if (mode === "today") return shuffle(todayPicks(all, n));
     else if (mode === "cat") {
       const qs = all.filter((q) => q.cat === cat);
       // まだやってないものを優先
@@ -230,6 +263,27 @@
       return pool.slice(0, n);
     } else pool = all;
     return shuffle(pool).slice(0, n);
+  }
+
+  // 類題：にがての 問題と おなじ 単元の、にがてでは ない 問題（まだ やってない ものを 先に）
+  function similar(base, k) {
+    if (k <= 0 || !base.length) return [];
+    const ids = new Set(base.map((q) => q.id)), keys = new Set(base.map(knowOf));
+    const cand = QUIZZES.filter((q) => keys.has(knowOf(q)) && !ids.has(q.id) && !isWeak(q));
+    return [...shuffle(cand.filter((q) => !isDone(q))), ...shuffle(cand.filter(isDone))].slice(0, k);
+  }
+  // きょうの おすすめ：にがて 2もん ＋ まだ やってない もん ＋ たりなければ ひさしぶりの もん
+  function todayPicks(all, n) {
+    const out = [], ids = new Set();
+    const add = (qs) => qs.forEach((q) => { if (out.length < n && !ids.has(q.id)) { ids.add(q.id); out.push(q); } });
+    add(all.filter(isWeak).sort(weakSort).slice(0, Math.min(2, n - 1)));
+    add(shuffle(all.filter((q) => !isDone(q))));
+    add(all.filter(isDone).sort((a, b) => data.results[a.id].last - data.results[b.id].last));
+    return out;
+  }
+  // ホームに 出す 件数は ここで まとめて 数える（出題と おなじ 条件）
+  function countsOf(qs) {
+    return { total: qs.length, notDone: qs.filter((q) => !isDone(q)).length, weak: qs.filter(isWeak).length, done: qs.filter(isDone).length };
   }
 
   function startRound(mode, cat) {
@@ -254,7 +308,7 @@
           `<i class="${x.answer === null ? (i === round.idx ? "now" : "") : x.answer ? "ok" : "ng"}"></i>`).join("")}</div>
         <span class="small">${round.idx + 1}/${round.items.length}</span>
       </div>
-      <div class="qcard">
+      <div class="qcard" data-id="${esc(it.q.id)}">
         <div class="catname">${catIcon(c, "sm")} ${esc(c.name)}${it.firstTime ? `<span class="badge new">はじめて</span>` : ""}${it.ng ? `<span class="badge ngc">${I("ng")}${it.ng}かい まちがえた</span>` : ""}</div>
         <div class="qtext">${rich(it.q.q)}</div>
         <button class="speak" data-act="speak" aria-label="よみあげ">${I("speaker")}</button>
@@ -275,7 +329,8 @@
     const ok = picked === it.q.a;
     it.answer = ok;
 
-    const r = data.results[it.q.id] || { n: 0, ok: 0 };
+    const r = data.results[it.q.id] || { n: 0, ok: 0, first: ok ? 1 : 0 };
+    r.h = ((r.h || "") + (ok ? "1" : "0")).slice(-HIST);
     r.ng = ngOf(r) + (ok ? 0 : 1);
     r.streak = ok ? streakOf(r) + 1 : 0;
     r.n += 1;
@@ -440,7 +495,10 @@
     const totalOk = answered.reduce((s, r) => s + r.ok, 0);
     const totalNg = answered.reduce((s, r) => s + ngOf(r), 0);
     const weak = qsLv.filter(isWeak).sort(weakSort);
-    const modeName = (s) => (s.lv ? levelOf(s.lv).name + "・" : "") + (s.mode === "new" ? "まだやってない" : s.mode === "wrong" ? "にがて ふくしゅう" : s.mode === "cat" ? catOf(s.cat).name : "ランダム");
+    // はじめて といた ときの 正解（ふくしゅうでの 正解とは 分けて 見る）
+    const firsts = answered.filter((r) => r.first != null);
+    const firstOk = firsts.filter((r) => r.first === 1).length;
+    const modeName = (s) => (s.lv ? levelOf(s.lv).name + "・" : "") + (s.mode === "today" ? "きょうの おすすめ" : s.mode === "new" ? "まだやってない" : s.mode === "one" ? "1もん" : s.mode === "wrong" ? "にがて ふくしゅう" : s.mode === "cat" ? catOf(s.cat).name : "ランダム");
 
     app.innerHTML = `
       <div class="top">
@@ -453,6 +511,7 @@
         <div><b>${totalN}</b><span>こたえた かいすう</span></div>
         <div><b>${totalN ? Math.round((totalOk / totalN) * 100) : 0}%</b><span>せいかいりつ</span></div>
         <div><b>${totalNg}</b><span>まちがえた かいすう</span></div>
+        ${firsts.length ? `<p class="small sub">はじめての もんだいで せいかい：${firstOk} / ${firsts.length}もん（${Math.round((firstOk / firsts.length) * 100)}%）</p>` : ""}
       </div>
 
       <div class="panel">
@@ -532,15 +591,17 @@
     const reader = new FileReader();
     reader.onload = () => {
       try {
-        const d = JSON.parse(reader.result);
-        if (!d || typeof d.results !== "object") throw new Error("format");
-        if (!confirm("いまの きろくを、よみこんだ きろくで おきかえますか？")) return;
-        data = { ...defaults(), ...d, settings: { ...defaults().settings, ...(d.settings || {}) } };
+        // こわれた ファイルや ちがう ファイルなら、いまの きろくには さわらない
+        ev.target.value = ""; // おなじ ファイルを もういちど えらべる ように
+        const d = sanitize(JSON.parse(reader.result));
+        if (!d) throw new Error("format");
+        if (!confirm(`いまの きろくを、よみこんだ きろく（${Object.keys(d.results).length}もんぶん）で おきかえますか？`)) return;
+        data = d;
         save();
         alert("よみこみました！");
         renderHistory();
       } catch (e) {
-        alert("ファイルを よみこめませんでした");
+        alert("ファイルを よみこめませんでした（いまの きろくは そのままです）");
       }
     };
     reader.readAsText(file);

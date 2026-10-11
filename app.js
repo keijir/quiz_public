@@ -76,17 +76,28 @@
   const plain = (s) => SPEECH.reduce((t, [re, to]) => t.replace(re, to),
     String(s).replace(/[\p{Extended_Pictographic}\u{FE0F}\u{200D}\u{1F3FB}-\u{1F3FF}]/gu, "")).trim();
 
+  // 英語の 部分は 英語の 声で、それ以外は 日本語の 声で 読む
+  const EN_PART = /([A-Za-z][A-Za-z0-9'’ .,!?-]*[A-Za-z.!?]|[A-Za-z])/;
+  function voiceFor(lang) {
+    const vs = speechSynthesis.getVoices();
+    return vs.find((v) => v.lang && v.lang.replace("_", "-").startsWith(lang)) ||
+      vs.find((v) => v.lang && v.lang.startsWith(lang.slice(0, 2)));
+  }
   function speak(text) {
     if (!("speechSynthesis" in window)) return;
     try {
       speechSynthesis.cancel();
-      const u = new SpeechSynthesisUtterance(plain(text));
-      u.lang = "ja-JP";
-      u.rate = 0.9;
-      u.pitch = 1.1;
-      const v = speechSynthesis.getVoices().find((v) => v.lang && v.lang.startsWith("ja"));
-      if (v) u.voice = v;
-      speechSynthesis.speak(u);
+      plain(text).split(EN_PART).forEach((part, i) => {
+        if (!part.trim()) return;
+        const en = i % 2 === 1;
+        const u = new SpeechSynthesisUtterance(part);
+        u.lang = en ? "en-US" : "ja-JP";
+        u.rate = en ? 0.8 : 0.9;
+        u.pitch = en ? 1 : 1.1;
+        const v = voiceFor(u.lang);
+        if (v) u.voice = v;
+        speechSynthesis.speak(u);
+      });
     } catch (e) { /* noop */ }
   }
 

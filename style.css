@@ -244,3 +244,8 @@ label.opt select { max-width: 60%; }
 .mini small { font-size: 13px; color: var(--sub); font-weight: 500; white-space: nowrap; }
 .mini[disabled] { opacity: .45; pointer-events: none; }
 .stats .sub { grid-column: 1 / -1; margin: 6px 0 0; }
+
+/* ふりがな */
+ruby { ruby-align: center; }
+rt { font-size: .5em; font-weight: 500; color: var(--sub); line-height: 1; }
+.choice rt { color: inherit; opacity: .75; }

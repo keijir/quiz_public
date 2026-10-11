@@ -23,10 +23,15 @@
     if (!obj(d) || !obj(d.results)) return null;
     const cnt = (x) => (Number.isFinite(x) && x >= 0 ? Math.floor(x) : null);
     const results = {};
-    for (const [id, r] of Object.entries(d.results)) {
+    // 問題の 見直しで id が かわった ものは、新しい id に うつす（RENAMES：古い id → 新しい id）
+    const RENAMES = window.ID_RENAMES || {};
+    for (const [old, r] of Object.entries(d.results)) {
+      const id = RENAMES[old] || old;
+      if (id !== old && d.results[id]) continue; // 新しい id の 記録が すでに あれば そちらを のこす
       if (!obj(r)) continue;
       const n = cnt(r.n), ok = cnt(r.ok);
       if (!n || ok == null || ok > n) continue;
+      if (results[id] && results[id].n >= n) continue; // 2つの 古い 問題が 1つに まとまった ときは 回数の 多い ほう
       const x = { n, ok, last: cnt(r.last) || 0, lastOk: !!r.lastOk };
       if (cnt(r.ng) != null) x.ng = Math.min(cnt(r.ng), n);
       if (cnt(r.streak) != null) x.streak = Math.min(cnt(r.streak), n);
@@ -36,7 +41,7 @@
       results[id] = x;
     }
     const sessions = Array.isArray(d.sessions) ? d.sessions.filter((s) => obj(s) && cnt(s.total) && cnt(s.correct) != null && s.correct <= s.total).slice(0, 100) : [];
-    const seen = Array.isArray(d.seen) ? d.seen.filter((x) => typeof x === "string") : null;
+    const seen = Array.isArray(d.seen) ? d.seen.filter((x) => typeof x === "string").map((x) => RENAMES[x] || x) : null;
     const def = defaults().settings, st = obj(d.settings) ? d.settings : {};
     const settings = { ...def };
     for (const k of Object.keys(def)) if (typeof st[k] === typeof def[k]) settings[k] = st[k];
@@ -99,7 +104,10 @@
     return `${d.getMonth() + 1}/${d.getDate()} ${d.getHours()}:${String(d.getMinutes()).padStart(2, "0")}`;
   };
   // 表示用：エスケープして、分数（3/4）を たての 分数に する
+  // {漢字|よみ} は ふりがな（まだ 習っていない 漢字に build.py が つける）
+  const RUBY = /\{([^{}|]+)\|([^{}]+)\}/g;
   const rich = (s) => esc(s)
+    .replace(RUBY, "<ruby>$1<rt>$2</rt></ruby>")
     .replace(/🔊/g, () => window.icon("speaker", "inline"))
     .replace(/(\d+)\/(\d+)/g, '<span class="frac"><span>$1</span><span>$2</span></span>')
     .replace(/([○●■]{2,}|(?<=\s)[○●■](?=\s|$))/gm, '<span class="marks">$1</span>'); // グラフの しるしを 大きく
@@ -120,7 +128,7 @@
     [/□/g, "しかく"],
   ];
   const plain = (s) => SPEECH.reduce((t, [re, to]) => t.replace(re, to),
-    String(s).replace(/[\p{Extended_Pictographic}\u{FE0F}\u{200D}\u{1F3FB}-\u{1F3FF}]/gu, "")).trim();
+    String(s).replace(RUBY, "$2").replace(/[\p{Extended_Pictographic}\u{FE0F}\u{200D}\u{1F3FB}-\u{1F3FF}]/gu, "")).trim();
 
   // 英語の 部分は 英語の 声で、それ以外は 日本語の 声で 読む
   const EN_PART = /([A-Za-z][A-Za-z0-9'’ .,!?-]*[A-Za-z.!?]|[A-Za-z])/;
@@ -313,7 +321,7 @@
         <div class="qtext">${rich(it.q.q)}</div>
         <button class="speak" data-act="speak" aria-label="よみあげ">${I("speaker")}</button>
       </div>
-      <div class="choices ${it.choices.some((ch) => [...ch].length > 8) ? "wide" : ""}">
+      <div class="choices ${it.choices.some((ch) => [...ch.replace(RUBY, "$1")].length > 8) ? "wide" : ""}">
         ${it.choices.map((ch, i) => `<button class="choice" data-act="answer" data-i="${i}">${rich(ch)}</button>`).join("")}
       </div>
       <div id="judge"></div>

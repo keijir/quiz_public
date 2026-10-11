@@ -127,3 +127,16 @@ select { font: inherit; font-size: 18px; padding: 4px 8px; border-radius: 10px; 
 .iconbtn { white-space: nowrap; flex: none; }
 .qtext { padding-right: 40px; }
 @media (max-width: 420px) { .title { font-size: 24px; } }
+
+/* ---- がくねん きりかえ ---- */
+.levels { display: grid; grid-template-columns: repeat(4, 1fr); gap: 6px; margin: 4px 0 10px; }
+.lv {
+  position: relative; background: var(--card); border-radius: 14px; padding: 8px 2px; font-size: 15px; font-weight: 700;
+  box-shadow: 0 3px 0 var(--line); border: 3px solid transparent; white-space: nowrap;
+}
+.lv.on { border-color: var(--accent); background: #fff0e3; }
+.lv i {
+  position: absolute; top: -8px; right: -4px; font-style: normal; background: var(--ng); color: #fff;
+  font-size: 11px; border-radius: 99px; padding: 0 6px; line-height: 18px;
+}
+@media (max-width: 420px) { .lv { font-size: 13px; } }

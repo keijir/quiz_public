@@ -3,6 +3,7 @@
 
   const QUIZZES = window.QUIZZES;
   const CATS = window.CATEGORIES;
+  const LEVELS = window.LEVELS;
   const STORE_KEY = "nanikana-quiz-v1";
   const app = document.getElementById("app");
 
@@ -10,7 +11,7 @@
   // results:  { [quizId]: { n: 回答回数, ok: 正解回数, last: 最終日時(ms), lastOk: 最後に正解したか } }
   // sessions: [{ at, mode, total, correct }]  （新しい順・最大100件）
   // seen:     ホームを最後に開いたときに存在したクイズID（「あたらしく ふえた」表示用）
-  const defaults = () => ({ results: {}, sessions: [], seen: null, settings: { speak: true, perRound: 5 } });
+  const defaults = () => ({ results: {}, sessions: [], seen: null, settings: { speak: true, perRound: 5, level: "k" } });
 
   function load() {
     try {
@@ -28,6 +29,14 @@
   }
 
   const isDone = (q) => !!data.results[q.id];
+  const lvOf = (q) => q.lv || "k";
+  const levelOf = (id) => LEVELS.find((l) => l.id === id) || LEVELS[0];
+  // いま えらんでいる がくねんの クイズ
+  const levelQs = () => QUIZZES.filter((q) => lvOf(q) === data.settings.level);
+  const levelTabs = () => `<div class="levels">${LEVELS.map((l) => {
+    const left = QUIZZES.filter((q) => lvOf(q) === l.id && !isDone(q)).length;
+    return `<button class="lv ${l.id === data.settings.level ? "on" : ""}" data-act="level" data-lv="${l.id}">${l.icon} ${esc(l.name)}${left ? `<i>${left}</i>` : ""}</button>`;
+  }).join("")}</div>`;
   const catOf = (id) => CATS.find((c) => c.id === id) || { name: id, icon: "❓", color: "#ccc" };
 
   // ---------- 小物 ----------
@@ -84,11 +93,13 @@
 
   // ---------- 画面: ホーム ----------
   function renderHome() {
-    const total = QUIZZES.length;
-    const notDone = QUIZZES.filter((q) => !isDone(q));
-    const wrong = QUIZZES.filter((q) => data.results[q.id] && !data.results[q.id].lastOk);
+    const qs = levelQs();
+    const total = qs.length;
+    const notDone = qs.filter((q) => !isDone(q));
+    const wrong = qs.filter((q) => data.results[q.id] && !data.results[q.id].lastOk);
     const known = data.seen ? new Set(data.seen) : null;
     const added = known ? QUIZZES.filter((q) => !known.has(q.id)) : [];
+    const addedByLv = LEVELS.map((l) => [l, added.filter((q) => lvOf(q) === l.id).length]).filter(([, n]) => n);
     // 次回のために、いま存在するIDを記録
     data.seen = QUIZZES.map((q) => q.id);
     save();
@@ -98,7 +109,8 @@
         <div class="title">なにかな？<span>クイズ</span></div>
         <button class="iconbtn" data-act="history">📒 きろく</button>
       </div>
-      ${added.length ? `<div class="panel">🎉 あたらしい クイズが <b>${added.length}もん</b> ふえたよ！</div>` : ""}
+      ${levelTabs()}
+      ${added.length ? `<div class="panel">🎉 あたらしい クイズが <b>${added.length}もん</b> ふえたよ！<br><span class="small">${addedByLv.map(([l, n]) => `${esc(l.name)} ${n}もん`).join("・")}</span></div>` : ""}
       <button class="big primary" data-act="start" data-mode="new" ${notDone.length ? "" : "disabled"}>
         <span class="em">✨</span>
         <span class="grow">まだ やってない クイズ<small>${notDone.length ? `のこり ${notDone.length}もん` : "ぜんぶ やったよ！すごい！"}</small></span>
@@ -114,16 +126,16 @@
       <h2>テーマで えらぶ</h2>
       <div class="grid">
         ${CATS.map((c) => {
-          const qs = QUIZZES.filter((q) => q.cat === c.id);
-          if (!qs.length) return "";
-          const done = qs.filter(isDone).length;
-          const left = qs.length - done;
+          const cqs = qs.filter((q) => q.cat === c.id);
+          if (!cqs.length) return "";
+          const done = cqs.filter(isDone).length;
+          const left = cqs.length - done;
           return `<button class="cat" style="--c:${c.color}" data-act="start" data-mode="cat" data-cat="${c.id}">
             ${left ? `<span class="badge">のこり${left}</span>` : `<span class="badge done">👑</span>`}
             <span class="em">${c.icon}</span>
             <span class="nm">${esc(c.name)}</span>
-            <div class="bar"><i style="width:${Math.round((done / qs.length) * 100)}%"></i></div>
-            <span class="cnt">${done} / ${qs.length}</span>
+            <div class="bar"><i style="width:${Math.round((done / cqs.length) * 100)}%"></i></div>
+            <span class="cnt">${done} / ${cqs.length}</span>
           </button>`;
         }).join("")}
       </div>
@@ -135,15 +147,16 @@
 
   function pickQuestions(mode, cat) {
     const n = data.settings.perRound;
+    const all = levelQs();
     let pool;
-    if (mode === "new") pool = QUIZZES.filter((q) => !isDone(q));
-    else if (mode === "wrong") pool = QUIZZES.filter((q) => data.results[q.id] && !data.results[q.id].lastOk);
+    if (mode === "new") pool = all.filter((q) => !isDone(q));
+    else if (mode === "wrong") pool = all.filter((q) => data.results[q.id] && !data.results[q.id].lastOk);
     else if (mode === "cat") {
-      const qs = QUIZZES.filter((q) => q.cat === cat);
+      const qs = all.filter((q) => q.cat === cat);
       // まだやってないものを優先
       pool = [...shuffle(qs.filter((q) => !isDone(q))), ...shuffle(qs.filter(isDone))];
       return pool.slice(0, n);
-    } else pool = QUIZZES;
+    } else pool = all;
     return shuffle(pool).slice(0, n);
   }
 
@@ -178,7 +191,7 @@
       </div>
       <div id="judge"></div>
     `;
-    if (data.settings.speak) speak(it.q.q);
+    if (data.settings.speak) speak(it.q.say || it.q.q);
   }
 
   function answer(i) {
@@ -237,20 +250,20 @@
   function renderResult() {
     const total = round.items.length;
     const correct = round.items.filter((x) => x.answer).length;
-    data.sessions.unshift({ at: Date.now(), mode: round.mode, cat: round.cat || null, total, correct });
+    data.sessions.unshift({ at: Date.now(), lv: data.settings.level, mode: round.mode, cat: round.cat || null, total, correct });
     data.sessions = data.sessions.slice(0, 100);
     save();
 
     const ratio = correct / total;
     const stars = ratio === 1 ? 3 : ratio >= 0.6 ? 2 : ratio > 0 ? 1 : 0;
     const msg = ratio === 1 ? "ぜんもん せいかい！ てんさい！" : ratio >= 0.6 ? "よく できました！" : "がんばったね！ また やってみよう！";
-    const left = QUIZZES.filter((q) => !isDone(q)).length;
+    const left = levelQs().filter((q) => !isDone(q)).length;
     app.innerHTML = `
       <div class="result">
         <div class="stars">${"⭐".repeat(stars)}${"☆".repeat(3 - stars)}</div>
         <div class="score">${total}もん ちゅう ${correct}もん せいかい</div>
         <div class="qtext" style="font-size:24px">${msg}</div>
-        <p class="small">まだ やってない クイズは あと ${left}もん</p>
+        <p class="small">${esc(levelOf(data.settings.level).name)}の まだ やってない クイズは あと ${left}もん</p>
       </div>
       <button class="big primary" data-act="start" data-mode="${round.mode}" ${round.cat ? `data-cat="${round.cat}"` : ""}><span class="em">🔁</span><span class="grow">もういっかい</span></button>
       <button class="big" data-act="home"><span class="em">🏠</span><span class="grow">はじめに もどる</span></button>
@@ -260,19 +273,21 @@
 
   // ---------- 画面: きろく ----------
   function renderHistory() {
-    const done = QUIZZES.filter(isDone);
-    const answered = Object.values(data.results);
+    const qsLv = levelQs();
+    const done = qsLv.filter(isDone);
+    const answered = qsLv.map((q) => data.results[q.id]).filter(Boolean);
     const totalN = answered.reduce((s, r) => s + r.n, 0);
     const totalOk = answered.reduce((s, r) => s + r.ok, 0);
-    const modeName = (s) => s.mode === "new" ? "まだやってない" : s.mode === "wrong" ? "リベンジ" : s.mode === "cat" ? catOf(s.cat).name : "ランダム";
+    const modeName = (s) => (s.lv ? levelOf(s.lv).name + "・" : "") + (s.mode === "new" ? "まだやってない" : s.mode === "wrong" ? "リベンジ" : s.mode === "cat" ? catOf(s.cat).name : "ランダム");
 
     app.innerHTML = `
       <div class="top">
         <button class="iconbtn" data-act="home">🏠 もどる</button>
         <div class="title" style="font-size:24px">📒 きろく</div>
       </div>
+      ${levelTabs()}
       <div class="panel stats">
-        <div><b>${done.length}<small style="font-size:16px">/${QUIZZES.length}</small></b><span>やった クイズ</span></div>
+        <div><b>${done.length}<small style="font-size:16px">/${qsLv.length}</small></b><span>やった クイズ</span></div>
         <div><b>${totalN}</b><span>こたえた かいすう</span></div>
         <div><b>${totalN ? Math.round((totalOk / totalN) * 100) : 0}%</b><span>せいかいりつ</span></div>
       </div>
@@ -288,7 +303,7 @@
       </div>
 
       ${CATS.map((c) => {
-        const qs = QUIZZES.filter((q) => q.cat === c.id);
+        const qs = qsLv.filter((q) => q.cat === c.id);
         if (!qs.length) return "";
         const d = qs.filter(isDone).length;
         return `<div class="panel"><details>
@@ -362,7 +377,12 @@
     else if (act === "start") { startRound(el.dataset.mode, el.dataset.cat); window.scrollTo(0, 0); }
     else if (act === "answer") answer(Number(el.dataset.i));
     else if (act === "next") next();
-    else if (act === "speak") speak(round.items[round.idx].q.q);
+    else if (act === "speak") speak(round.items[round.idx].q.say || round.items[round.idx].q.q);
+    else if (act === "level") {
+      data.settings.level = el.dataset.lv;
+      save();
+      if (app.querySelector(".stats")) renderHistory(); else renderHome();
+    }
     else if (act === "export") exportData();
     else if (act === "import") app.querySelector("#importFile").click();
     else if (act === "reset") {

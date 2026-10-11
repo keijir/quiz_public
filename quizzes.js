@@ -6,13 +6,17 @@
 // - a: せいかい / w: まちがいの選択肢（表示時にシャッフルされる）
 // - e: こたえのあとに出るひとこと（省略可）
 // - lv: がくねん（省略時は "k" = ねんちょう）
+// - unit: 単元コード（docs/curriculum.md）。scripts/quizgen で生成する問題は quizzes-extra.js に入る
 // - say: よみあげ用の文（省略時は q をそのまま読む。かんじの よみの もんだい など こたえが ばれる ときに つかう）
 
 window.LEVELS = [
-  { id: "k", name: "ねんちょう", icon: "🐣" },
-  { id: "1", name: "1ねんせい", icon: "🎒" },
-  { id: "2", name: "2ねんせい", icon: "📗" },
-  { id: "3", name: "3ねんせい", icon: "📘" },
+  { id: "k", name: "ねんちょう", short: "ねんちょう", icon: "🐣" },
+  { id: "1", name: "1ねんせい", short: "1ねん", icon: "🎒" },
+  { id: "2", name: "2ねんせい", short: "2ねん", icon: "📗" },
+  { id: "3", name: "3ねんせい", short: "3ねん", icon: "📘" },
+  { id: "4", name: "4年生", short: "4ねん", icon: "📙" },
+  { id: "5", name: "5年生", short: "5ねん", icon: "📕" },
+  { id: "6", name: "6年生", short: "6ねん", icon: "🎓" },
 ];
 
 window.CATEGORIES = [
@@ -25,10 +29,13 @@ window.CATEGORIES = [
   { id: "life", name: "せいかつ", icon: "🏠", color: "#aed581" },
   { id: "word", name: "ことば", icon: "🔤", color: "#f06292" },
   { id: "nature", name: "しぜん・きせつ", icon: "🌸", color: "#81c784" },
-  { id: "keisan", name: "けいさん", icon: "🧮", color: "#4fc3f7" },
+  { id: "hyougen", name: "おと・うた", icon: "🎵", color: "#ffd54f" },
+  { id: "keisan", name: "さんすう", icon: "🧮", color: "#4fc3f7" },
   { id: "kanji", name: "かんじ", icon: "✍️", color: "#ff8a65" },
   { id: "science", name: "りか", icon: "🔬", color: "#9ccc65" },
   { id: "society", name: "しゃかい", icon: "🗾", color: "#a1887f" },
+  { id: "eigo", name: "えいご", icon: "🌍", color: "#4db6ac" },
+  { id: "katei", name: "かてい", icon: "🍳", color: "#ff8a80" },
 ];
 
 window.QUIZZES = [

@@ -33,9 +33,11 @@
   const levelOf = (id) => LEVELS.find((l) => l.id === id) || LEVELS[0];
   // いま えらんでいる がくねんの クイズ
   const levelQs = () => QUIZZES.filter((q) => lvOf(q) === data.settings.level);
+  // がくねんタブ（7つ → 4つ＋3つの 2だん。はばを こえない ように なまえは みじかく）
   const levelTabs = () => `<div class="levels">${LEVELS.map((l) => {
     const left = QUIZZES.filter((q) => lvOf(q) === l.id && !isDone(q)).length;
-    return `<button class="lv ${l.id === data.settings.level ? "on" : ""}" data-act="level" data-lv="${l.id}">${l.icon} ${esc(l.name)}${left ? `<i>${left}</i>` : ""}</button>`;
+    return `<button class="lv ${l.id === data.settings.level ? "on" : ""}" data-act="level" data-lv="${l.id}">
+      <b class="${[...(l.short || l.name)].length > 4 ? "long" : ""}">${esc(l.short || l.name)}</b><small>${left ? `のこり ${left}` : "👑"}</small></button>`;
   }).join("")}</div>`;
   const catOf = (id) => CATS.find((c) => c.id === id) || { name: id, icon: "❓", color: "#ccc" };
 
@@ -53,8 +55,26 @@
     const d = new Date(ms);
     return `${d.getMonth() + 1}/${d.getDate()} ${d.getHours()}:${String(d.getMinutes()).padStart(2, "0")}`;
   };
-  // 絵文字を読み上げないようにする
-  const plain = (s) => String(s).replace(/[\p{Extended_Pictographic}\u{FE0F}\u{200D}\u{1F3FB}-\u{1F3FF}]/gu, "").replace(/□/g, "しかく").trim();
+  // 表示用：エスケープして、分数（3/4）を たての 分数に する
+  const rich = (s) => esc(s).replace(/(\d+)\/(\d+)/g, '<span class="frac"><span>$1</span><span>$2</span></span>');
+
+  // 読み上げ用：絵文字を はずし、記号・単位・分数を 読み方に かえる
+  const SPEECH = [
+    [/(\d+)\/(\d+)/g, "$2ぶんの$1"],
+    [/(\d+):(\d+)/g, "$1 たい $2"],
+    [/km²/g, "へいほうキロメートル"], [/cm²/g, "へいほうセンチメートル"], [/m²/g, "へいほうメートル"],
+    [/cm³/g, "りっぽうセンチメートル"], [/m³/g, "りっぽうメートル"],
+    [/(\d|何)\s*km/g, "$1キロメートル"], [/(\d|何)\s*cm/g, "$1センチメートル"], [/(\d|何)\s*mm/g, "$1ミリメートル"],
+    [/(\d|何)\s*mL/g, "$1ミリリットル"], [/(\d|何)\s*dL/g, "$1デシリットル"], [/(\d|何)\s*kg/g, "$1キログラム"],
+    [/(\d|何)\s*ha(?![a-z])/g, "$1ヘクタール"], [/(\d|何)\s*a(?![a-z])/g, "$1アール"],
+    [/(\d|何)\s*m(?![a-zA-Z])/g, "$1メートル"], [/(\d|何)\s*L(?![a-zA-Z])/g, "$1リットル"],
+    [/(\d|何)\s*g(?![a-zA-Z])/g, "$1グラム"], [/(\d|何)\s*t(?![a-zA-Z])/g, "$1トン"],
+    [/°/g, "ど"], [/%/g, "パーセント"], [/℃/g, "ど"],
+    [/×/g, " かける "], [/÷/g, " わる "], [/＋/g, " たす "], [/−/g, " ひく "], [/＝/g, " は "],
+    [/□/g, "しかく"],
+  ];
+  const plain = (s) => SPEECH.reduce((t, [re, to]) => t.replace(re, to),
+    String(s).replace(/[\p{Extended_Pictographic}\u{FE0F}\u{200D}\u{1F3FB}-\u{1F3FF}]/gu, "")).trim();
 
   function speak(text) {
     if (!("speechSynthesis" in window)) return;
@@ -186,11 +206,11 @@
       </div>
       <div class="qcard">
         <div class="catname">${c.icon} ${esc(c.name)}${it.firstTime ? `<span class="badge new">はじめて</span>` : ""}</div>
-        <div class="qtext">${esc(it.q.q)}</div>
+        <div class="qtext">${rich(it.q.q)}</div>
         <button class="speak" data-act="speak" aria-label="よみあげ">🔊</button>
       </div>
       <div class="choices ${it.choices.some((ch) => [...ch].length > 8) ? "wide" : ""}">
-        ${it.choices.map((ch, i) => `<button class="choice" data-act="answer" data-i="${i}">${esc(ch)}</button>`).join("")}
+        ${it.choices.map((ch, i) => `<button class="choice" data-act="answer" data-i="${i}">${rich(ch)}</button>`).join("")}
       </div>
       <div id="judge"></div>
     `;
@@ -234,8 +254,8 @@
       <div class="sheet ${ok ? "is-ok" : "is-ng"}">
         <div class="judge">
           <div class="head"><span class="mark">${ok ? "⭕" : "❌"}</span><span class="msg">${msg}</span></div>
-          ${ok ? "" : `<div class="exp ans">こたえは「${esc(it.q.a)}」</div>`}
-          ${it.q.e ? `<div class="exp">💡 ${esc(it.q.e)}</div>` : ""}
+          ${ok ? "" : `<div class="exp ans">こたえは「${rich(it.q.a)}」</div>`}
+          ${it.q.e ? `<div class="exp">💡 ${rich(it.q.e)}</div>` : ""}
         </div>
         <button class="big primary" data-act="next"><span class="em">${last ? "🏁" : "👉"}</span><span class="grow">${last ? "けっかを みる" : "つぎの もんだい"}</span></button>
       </div>
@@ -322,7 +342,7 @@
           <ul class="qlist">${qs.map((q) => {
             const r = data.results[q.id];
             const st = !r ? `<span class="badge">まだ</span>` : r.lastOk ? `<span style="color:var(--ok)">⭕</span>` : `<span style="color:var(--ng)">❌</span>`;
-            return `<li><span class="st">${st}</span><span class="tx">${esc(q.q)}</span>
+            return `<li><span class="st">${st}</span><span class="tx">${rich(q.q)}</span>
               <span class="meta">${r ? `${r.ok}/${r.n}かい<br>${fmtDate(r.last)}` : ""}</span></li>`;
           }).join("")}</ul>
         </details></div>`;

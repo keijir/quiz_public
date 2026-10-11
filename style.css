@@ -154,15 +154,24 @@ select { font: inherit; font-size: 18px; padding: 4px 8px; border-radius: 10px; 
 .qtext { padding-right: 40px; }
 @media (max-width: 420px) { .title { font-size: 24px; } }
 
-/* ---- がくねん きりかえ ---- */
-.levels { display: grid; grid-template-columns: repeat(4, 1fr); gap: 6px; margin: 4px 0 10px; }
+/* ---- がくねん きりかえ（4れつ × 2だん。はみ出さない） ---- */
+.levels { display: grid; grid-template-columns: repeat(4, minmax(0, 1fr)); gap: 6px; margin: 4px 0 10px; }
 .lv {
-  position: relative; background: var(--card); border-radius: 14px; padding: 8px 2px; font-size: 15px; font-weight: 700;
-  box-shadow: 0 3px 0 var(--line); border: 3px solid transparent; white-space: nowrap;
+  min-width: 0; display: flex; flex-direction: column; align-items: center; gap: 1px;
+  background: var(--card); border-radius: 12px; padding: 5px 2px; line-height: 1.25;
+  box-shadow: 0 3px 0 var(--line); border: 3px solid transparent;
 }
+.lv b { font-size: 14px; max-width: 100%; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.lv small { font-size: 11px; color: var(--sub); white-space: nowrap; }
 .lv.on { border-color: var(--accent); background: #fff0e3; }
-.lv i {
-  position: absolute; top: -8px; right: -4px; font-style: normal; background: var(--ng); color: #fff;
-  font-size: 11px; border-radius: 99px; padding: 0 6px; line-height: 18px;
-}
-@media (max-width: 420px) { .lv { font-size: 13px; } }
+.lv b.long { font-size: 12px; letter-spacing: -0.03em; }
+@media (max-width: 360px) { .lv b { font-size: 12px; } .lv b.long { font-size: 11px; } }
+
+/* よこに ゆれない ように */
+html, body { overflow-x: hidden; overflow-x: clip; }
+#app { overflow-wrap: anywhere; }
+
+/* ぶんすう */
+.frac { display: inline-flex; flex-direction: column; vertical-align: middle; text-align: center; line-height: 1.05; font-size: .85em; margin: 0 .1em; }
+.frac > span:first-child { border-bottom: 2px solid currentColor; padding: 0 .15em; }
+.qtext { white-space: pre-line; }

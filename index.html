@@ -6,7 +6,7 @@
   <meta name="theme-color" content="#fff4d6">
   <meta http-equiv="Cache-Control" content="no-cache">
   <title>なにかな？クイズ</title>
-  <meta name="description" content="ねんちょう〜小学3年生むけの クイズ。どうぶつ・けいさん・かんじ・なぞなぞ など、よみあげ と きろく つき。">
+  <meta name="description" content="年長〜小学6年生むけの クイズ。学習指導要領に そった さんすう・こくご・りか・しゃかい・えいご と、なぞなぞ など。よみあげ と きろく つき。">
 
   <!-- アイコン / ホーム画面 -->
   <link rel="icon" type="image/png" sizes="32x32" href="icons/favicon-32.png">
@@ -22,12 +22,12 @@
   <meta property="og:type" content="website">
   <meta property="og:site_name" content="なにかな？クイズ">
   <meta property="og:title" content="なにかな？クイズ">
-  <meta property="og:description" content="ねんちょう〜小学3年生むけの クイズ。どうぶつ・けいさん・かんじ・なぞなぞ など、よみあげ と きろく つき。">
+  <meta property="og:description" content="年長〜小学6年生むけの クイズ。学習指導要領に そった さんすう・こくご・りか・しゃかい・えいご と、なぞなぞ など。よみあげ と きろく つき。">
   <meta property="og:url" content="https://keijir.github.io/quiz_public/">
   <meta property="og:image" content="https://keijir.github.io/quiz_public/ogp.png">
   <meta property="og:image:width" content="1200">
   <meta property="og:image:height" content="630">
-  <meta property="og:image:alt" content="なにかな？クイズ ― ねんちょう〜しょうがく3ねんせい">
+  <meta property="og:image:alt" content="なにかな？クイズ ― ねんちょう〜しょうがく6ねんせい">
   <meta property="og:locale" content="ja_JP">
   <meta name="twitter:card" content="summary_large_image">
 </head>
@@ -58,7 +58,9 @@
           l.rel = "stylesheet"; l.href = "style.css" + q; l.onload = ok; l.onerror = ok;
           document.head.appendChild(l);
         });
-        return Promise.all([css, addScript("quizzes.js" + q)]).then(function () { return addScript("app.js" + q); });
+        return Promise.all([css, addScript("quizzes.js" + q)])
+          .then(function () { return addScript("quizzes-extra.js" + q); })
+          .then(function () { return addScript("app.js" + q); });
       });
 
       // ひらいたままの タブに もどってきたとき、あたらしい版が あれば よみなおす（クイズの とちゅうは しない）

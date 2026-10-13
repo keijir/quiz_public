@@ -508,7 +508,7 @@
       ${(window.LINKS || []).map((l) => `
         <a class="big linkcard" href="${esc(l.url)}" target="_blank" rel="noopener noreferrer">
           <span class="ci" style="--c:${esc(l.color || "#bbb")}">${I(l.icon || "link")}</span>
-          <span class="grow">${esc(l.name)}<small>${esc(l.desc || "")}</small></span>
+          <span class="grow">${rich(l.name)}<small>${rich(l.desc || "")}</small></span>
           <span class="ext">${I("external")}</span>
         </a>`).join("")}
       <p class="small">おうちの かたへ：べつの サイトが あたらしい タブで ひらきます。</p>

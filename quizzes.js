@@ -51,6 +51,13 @@ window.LINKS = [
     icon: "kanji",
     color: "#ff8a65",
   },
+  {
+    name: "たのしく まなび{隊|たい}",
+    desc: "もんぶかがくしょうの まなびの サイト",
+    url: "https://tanoshikumanabitai.mext.go.jp",
+    icon: "book",
+    color: "#64b5f6",
+  },
 ];
 
 window.QUIZZES = [];

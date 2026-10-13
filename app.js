@@ -81,12 +81,12 @@
   const levelOf = (id) => LEVELS.find((l) => l.id === id) || LEVELS[0];
   // いま えらんでいる がくねんの クイズ
   const levelQs = () => QUIZZES.filter((q) => lvOf(q) === data.settings.level);
-  // がくねんタブ（7つ → 4つ＋3つの 2だん。はばを こえない ように なまえは みじかく）
-  const levelTabs = () => `<div class="levels">${LEVELS.map((l) => {
+  // がくねんタブ（7つ＋リンク集 → 4つ×2だん。はばを こえない ように なまえは みじかく）
+  const levelTabs = (onLinks) => `<div class="levels">${LEVELS.map((l) => {
     const left = QUIZZES.filter((q) => lvOf(q) === l.id && !isDone(q)).length;
-    return `<button class="lv ${l.id === data.settings.level ? "on" : ""}" data-act="level" data-lv="${l.id}">
+    return `<button class="lv ${!onLinks && l.id === data.settings.level ? "on" : ""}" data-act="level" data-lv="${l.id}">
       <b class="${[...(l.short || l.name)].length > 4 ? "long" : ""}">${esc(l.short || l.name)}</b><small>${left ? `のこり ${left}` : I("crown", "crown")}</small></button>`;
-  }).join("")}</div>`;
+  }).join("")}${(window.LINKS || []).length ? `<button class="lv ${onLinks ? "on" : ""}" data-act="links"><b>リンク</b><small>${I("link")}</small></button>` : ""}</div>`;
   const catOf = (id) => CATS.find((c) => c.id === id) || { name: id, icon: "nazo", color: "#bbb" };
 
   // ---------- 小物 ----------
@@ -493,6 +493,28 @@
     window.scrollTo(0, y || 0);
   }
 
+  // ---------- 画面: リンク集（べつの サイトを あたらしい タブで ひらく） ----------
+  function renderLinks() {
+    window.QUIZ_PLAYING = false;
+    stopSpeak();
+    app.style.paddingBottom = "";
+    app.innerHTML = `
+      <div class="top">
+        <div class="title">なにかな？<span>クイズ</span></div>
+        <button class="iconbtn" data-act="history">${I("book")} きろく</button>
+      </div>
+      ${levelTabs(true)}
+      <h2>${I("link")} リンクしゅう</h2>
+      ${(window.LINKS || []).map((l) => `
+        <a class="big linkcard" href="${esc(l.url)}" target="_blank" rel="noopener noreferrer">
+          <span class="ci" style="--c:${esc(l.color || "#bbb")}">${I(l.icon || "link")}</span>
+          <span class="grow">${esc(l.name)}<small>${esc(l.desc || "")}</small></span>
+          <span class="ext">${I("external")}</span>
+        </a>`).join("")}
+      <p class="small">おうちの かたへ：べつの サイトが あたらしい タブで ひらきます。</p>
+    `;
+  }
+
   // ---------- 画面: きろく ----------
   function renderHistory() {
     window.QUIZ_PLAYING = false;
@@ -631,6 +653,7 @@
     else if (act === "one") startOne(el.dataset.id, el.closest("[data-back]") ? el.closest("[data-back]").dataset.back : "list");
     else if (act === "back") goBack();
     else if (act === "testvoice") speak("こんにちは。なにかな クイズ です。りんご は えいごで apple。", 0);
+    else if (act === "links") { renderLinks(); window.scrollTo(0, 0); }
     else if (act === "level") {
       data.settings.level = el.dataset.lv;
       save();

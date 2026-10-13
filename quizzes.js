@@ -42,4 +42,15 @@ window.CATEGORIES = [
   { id: "katei", name: "かてい", icon: "pot", color: "#ff8a80" },
 ];
 
+// リンク集（学年タブの さいごの「リンク」タブ）。べつの サイトを あたらしい タブで ひらく
+window.LINKS = [
+  {
+    name: "かんじ くみたて",
+    desc: "パーツを くみあわせて かんじを つくろう",
+    url: "https://script.google.com/macros/s/AKfycbwazSI_1cNcUgUt2Invr5w80QzsQUFUth33C-niCDIlIXXSrmwrsy6WZ3rn7jH1JZev/exec",
+    icon: "kanji",
+    color: "#ff8a65",
+  },
+];
+
 window.QUIZZES = [];

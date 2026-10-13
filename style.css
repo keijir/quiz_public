@@ -249,3 +249,10 @@ label.opt select { max-width: 60%; }
 ruby { ruby-align: center; }
 rt { font-size: .5em; font-weight: 500; color: var(--sub); line-height: 1; }
 .choice rt { color: inherit; opacity: .75; }
+
+/* リンク集 */
+a.big.linkcard { color: inherit; text-decoration: none; }
+.linkcard .ci { width: 48px; height: 48px; border-radius: 14px; flex: none; }
+.linkcard .ci .ic { width: 28px; height: 28px; }
+.linkcard .ext { color: var(--sub); }
+.lv[data-act="links"] small .ic { color: var(--accent); }
